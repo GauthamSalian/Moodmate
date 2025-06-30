@@ -79,19 +79,23 @@ const StressDashboard = ({ fusionInputs }) => {
 
   // Twitter analysis handler
   const handleAnalyze = async () => {
-    setLoading(true);
-    setError("");
-    setTwitterResults(null);
-    try {
-      const res = await axios.get(
-        `http://localhost:8000/analyze_tweets/${twitterUsername}`
-      );
-      setTwitterResults(res.data.results || []);
-    } catch (err) {
-      setError("Failed to fetch Twitter analysis.");
+  setLoading(true);
+  setError("");
+  setTwitterResults(null);
+  try {
+    const res = await axios.get(
+      `http://localhost:8000/analyze_tweets/${twitterUsername}`
+    );
+    if (res.data.results) {
+      setTwitterResults(res.data.results);
+    } else {
+      setError(res.data.error || "No results found.");
     }
-    setLoading(false);
-  };
+  } catch (err) {
+    setError("Failed to fetch Twitter analysis.");
+  }
+  setLoading(false);
+};
 
   return (
     <div className="ml-64 p-6">
@@ -127,6 +131,7 @@ const StressDashboard = ({ fusionInputs }) => {
         >
           {loading ? "Analyzing..." : "Analyze Tweets"}
         </button>
+        {loading && <div className="text-blue-500 mt-2">Loading...</div>}
         {error && <div className="text-red-500 mt-2">{error}</div>}
         {twitterResults && (
           <div className="mt-4">
