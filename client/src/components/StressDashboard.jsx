@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import axios from "axios";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const StressDashboard = ({ fusionInputs }) => {
   const [history, setHistory] = useState([]);
+  const [twitterUsername, setTwitterUsername] = useState("");
+  const [twitterResults, setTwitterResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const valid = Object.values(fusionInputs).filter(x => x !== null);
@@ -72,6 +77,22 @@ const StressDashboard = ({ fusionInputs }) => {
     },
   };
 
+  // Twitter analysis handler
+  const handleAnalyze = async () => {
+    setLoading(true);
+    setError("");
+    setTwitterResults(null);
+    try {
+      const res = await axios.get(
+        `http://localhost:8000/analyze_tweets/${twitterUsername}`
+      );
+      setTwitterResults(res.data.results || []);
+    } catch (err) {
+      setError("Failed to fetch Twitter analysis.");
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="ml-64 p-6">
       <h2 className="text-2xl font-bold mb-4">📊 Stress Fusion Dashboard</h2>
@@ -87,6 +108,40 @@ const StressDashboard = ({ fusionInputs }) => {
             ))}
           </ul>
         </div>
+      </div>
+
+      {/* Twitter Analysis Section */}
+      <div className="mt-8 bg-white p-4 rounded shadow">
+        <h3 className="text-lg font-semibold mb-2">Twitter Stress Analysis</h3>
+        <input
+          type="text"
+          placeholder="Enter Twitter username"
+          value={twitterUsername}
+          onChange={e => setTwitterUsername(e.target.value)}
+          className="border px-2 py-1 rounded mr-2"
+        />
+        <button
+          onClick={handleAnalyze}
+          disabled={loading || !twitterUsername}
+          className="bg-blue-500 text-white px-3 py-1 rounded"
+        >
+          {loading ? "Analyzing..." : "Analyze Tweets"}
+        </button>
+        {error && <div className="text-red-500 mt-2">{error}</div>}
+        {twitterResults && (
+          <div className="mt-4">
+            <h4 className="font-semibold">Results:</h4>
+            <ul className="list-disc ml-5 text-sm">
+              {twitterResults.map((tweet, idx) => (
+                <li key={idx}>
+                  <strong>{tweet.date}:</strong> {tweet.text}
+                  <br />
+                  Risk: {tweet.risk_detected}, Confidence: {tweet.confidence}, Probability: {tweet.probability_of_risk}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
