@@ -38,7 +38,7 @@ function App() {
           {/* Other inputs/components can go here */}
           <Routes>
             <Route path="/chat" element={<ChatInterface />} />
-            <Route path="/chatbot" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
+            <Route path="/chatbot/*" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
             <Route path="/dashboard" element={<StressDashboard fusionInputs={fusionInputs} />} />
             <Route path="/inputs" element={<InputMonitor setFusionInputs={setFusionInputs} />} />
             <Route path="/logs" element={<Logs />} />
