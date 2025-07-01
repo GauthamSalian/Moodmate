@@ -1,7 +1,8 @@
-flask
-flask-cors
 fastapi
-httpx
-python-dotenv
-pydantic
 uvicorn
+requests
+python-dotenv
+transformers
+torch
+starlette
+accelarate

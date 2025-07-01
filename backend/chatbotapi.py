@@ -17,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-API_KEY = "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"
+API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 
 BASE_PROMPT = """

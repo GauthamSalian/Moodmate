@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import axios from "axios";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
@@ -51,26 +52,36 @@ const StressDashboard = ({ fusionInputs }) => {
   };
 
   const options = {
-    scales: {
-      y: {
-        min: 0,
-        max: 1,
-        title: {
-          display: true,
-          text: 'Score',
-        },
-      },
-    },
-    plugins: {
-      legend: {
+  scales: {
+    y: {
+      min: 0,
+      max: 1,
+      title: {
         display: true,
-        labels: {
-          usePointStyle: true,
-          boxWidth: 12,
-        },
+        text: 'Risk Probability',
+      },
+      grid: {
+        color: "#e5e7eb",
       },
     },
-  };
+    x: {
+      grid: {
+        color: "#e5e7eb",
+      },
+    },
+  },
+  plugins: {
+    legend: {
+      display: false, // Hide legend for a cleaner look
+    },
+    tooltip: {
+      enabled: true,
+      callbacks: {
+        label: ctx => ` ${ctx.parsed.y}`,
+      },
+    },
+  },
+};
 
   return (
     <div className="ml-64 p-6">
