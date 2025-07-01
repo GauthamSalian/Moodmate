@@ -9,6 +9,7 @@ import {
   Menu,
   Moon,
   HeartHandshake,
+  Hash,
   LogOut
 } from 'lucide-react';
 
@@ -17,15 +18,16 @@ const menuItems = [
   { icon: <ChartNoAxesCombined size={18} />, label: 'Stress Dashboard', path: '/dashboard' },
   { icon: <SquareActivity size={18} />, label: 'Input Monitor', path: '/inputs' },
   { icon: <Logs size={18} />, label: 'Chat Logs', path: '/logs' },
-  { icon: <HeartHandshake size={18} />, label: 'Book a Session', path: '/book' }
+  { icon: <HeartHandshake size={18} />, label: 'Book a Session', path: '/book' },
+  { icon: <Hash size={18} />, label: 'Twitter Analyzer', path: '/twitter' }
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isCollapsed, setIsCollapsed }) {
   const [darkMode, setDarkMode] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeItem, setActiveItem] = useState('Posts');
 
   return (
+    <div className={`fixed top-0 left-0 h-screen bg-white shadow-md p-4 flex flex-col justify-between transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}style={{ height: '100vh' }}>
     <div className={`h-screen bg-white shadow-md p-4 flex flex-col justify-between transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
       <div>
         <div className="flex items-center justify-between mb-8">
@@ -93,6 +95,7 @@ export default function Sidebar() {
           {!isCollapsed && 'Logout'}
         </button>
       </div>
+    </div>
     </div>
   );
 }

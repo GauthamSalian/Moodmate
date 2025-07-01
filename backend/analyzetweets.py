@@ -6,8 +6,12 @@ import requests
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from dotenv import load_dotenv
+load_dotenv()
 BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
+print("BEARER_TOKEN:", "Loaded" if BEARER_TOKEN else "Missing or Empty")
+
+
 model_path_name = "ibm-granite/granite-guardian-3.2-3b-a800m"
 safe_token = "No"
 risky_token = "Yes"

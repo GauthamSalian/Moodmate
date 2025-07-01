@@ -17,6 +17,8 @@ function App() {
     typing: null
   });
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   const handleVoiceInput = (stress) => {
     console.log("🎤 Voice Stress →", stress);
     setFusionInputs(prev => ({ ...prev, voice: stress }));
@@ -25,15 +27,14 @@ function App() {
   return (
     <Router>
       <div className="flex">
-        <Sidebar />
-        <div className="flex-1 p-6">
+        <Sidebar isCollapsed={isSidebarCollapsed} setIsCollapsed={setIsSidebarCollapsed} />
+        <div className={`flex-1 p-6 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
           {/* <VoiceStressLive
             onVoiceStress={(score) => {
               console.log("🎙️ Voice Stress Score:", score);
               setFusionInputs(prev => ({ ...prev, voice: score }));
             }}
           /> */}
-          <ChatInterface voiceStressScore={fusionInputs.voice} />
           {/* Other inputs/components can go here */}
           <Routes>
             <Route path="/chat" element={<ChatInterface />} />
