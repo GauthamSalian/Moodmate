@@ -26,7 +26,7 @@ function ChatInterface() {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ user_input: input }),
       });
       const data = await res.json();
       setMessages((prev) => [
