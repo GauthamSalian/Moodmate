@@ -31,7 +31,8 @@ class Message(BaseModel):
     user_input: str
 
 @app.post("/chat")
-async def chat(message: Message):
+async def chat(message: Message, request: Request):
+    print(await request.json())  # Log raw incoming JSON
     async with httpx.AsyncClient() as client:
         headers = {
             "Authorization": f"Bearer {API_KEY}",

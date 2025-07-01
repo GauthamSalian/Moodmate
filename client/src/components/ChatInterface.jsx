@@ -26,12 +26,14 @@ function ChatInterface() {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ user_input: input }), // ✅ input is a string
       });
+
+
       const data = await res.json();
       setMessages((prev) => [
         ...prev,
-        { sender: "bot", text: data.reply || "Sorry, I didn't get that." },
+        { sender: "bot", text: data.response || "Sorry, I didn't get that." },
       ]);
     } catch {
       setMessages((prev) => [
