@@ -8,6 +8,7 @@ import Logs from './components/Logs';
 import TwitterAnalyzer from './components/TwitterAnalyzer';
 import ChatInterface from './components/ChatInterface';
 import BookingPage from './pages/BookingPage';
+import GoogleFitAuth from './components/GoogleFitAuth'; // ✅ Correct path
 
 function App() {
   const [fusionInputs, setFusionInputs] = useState({
@@ -29,13 +30,6 @@ function App() {
       <div className="flex">
         <Sidebar isCollapsed={isSidebarCollapsed} setIsCollapsed={setIsSidebarCollapsed} />
         <div className={`flex-1 p-6 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-          {/* <VoiceStressLive
-            onVoiceStress={(score) => {
-              console.log("🎙️ Voice Stress Score:", score);
-              setFusionInputs(prev => ({ ...prev, voice: score }));
-            }}
-          /> */}
-          {/* Other inputs/components can go here */}
           <Routes>
             <Route path="/chat" element={<ChatInterface />} />
             <Route path="/chatbot/*" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
@@ -45,6 +39,7 @@ function App() {
             <Route path="/twitter" element={<TwitterAnalyzer />} />
             <Route path="/book" element={<BookingPage />} />
             <Route path="/" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
+            <Route path="/sleep" element={<GoogleFitAuth onDataFetched={(data) => setFusionInputs(prev => ({ ...prev, ...data }))} />} />
           </Routes>
         </div>
       </div>
