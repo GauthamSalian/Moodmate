@@ -27,6 +27,7 @@ function ChatInterface() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_input: input }), // ✅ input is a string
+        body: JSON.stringify({ user_input: input }),
       });
 
 

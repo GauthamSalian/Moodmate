@@ -3,11 +3,15 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load variables from .env
 
 app = Flask(__name__)
 CORS(app)
 
-OPENROUTER_API_KEY = "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"  # 🔑 Put your actual OpenRouter key here
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")  # Get API key from .env
 
 @app.route('/chat', methods=['POST'])
 def chat():
