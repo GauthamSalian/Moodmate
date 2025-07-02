@@ -15,12 +15,10 @@ function ChatInterface() {
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load voices
   useEffect(() => {
     const loadVoices = () => {
       const voices = speechSynthesis.getVoices();
@@ -35,25 +33,21 @@ function ChatInterface() {
         setSelectedVoice(femaleVoices[0]);
       }
     };
-
     if (typeof speechSynthesis !== "undefined") {
       speechSynthesis.onvoiceschanged = loadVoices;
       loadVoices();
     }
   }, [selectedVoice]);
 
-  // Speak with selected voice
   const speak = (text) => {
     if (!text || !selectedVoice) return;
-
-    speechSynthesis.cancel(); // Stop any ongoing speech
+    speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = selectedVoice;
     utterance.lang = "en-US";
     utterance.pitch = 1.2;
     utterance.rate = 0.95;
     utterance.volume = 1.0;
-
     setIsBotSpeaking(true);
     utterance.onend = () => setIsBotSpeaking(false);
     speechSynthesis.speak(utterance);
@@ -61,7 +55,6 @@ function ChatInterface() {
 
   const sendMessage = async (textToSend = input) => {
     if (!textToSend.trim()) return;
-
     const userMsg = { sender: "user", text: textToSend };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -71,21 +64,66 @@ function ChatInterface() {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_input: input }), // ✅ input is a string
         body: JSON.stringify({ user_input: textToSend }),
       });
 
+      if (!res.body) throw new Error("No response stream");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let botText = "";
+      let spokenSoFar = "";
+      setMessages((prev) => [...prev, { sender: "bot", text: "" }]);
 
-      const data = await res.json();
-      const botReply = data.reply || "Sorry, I didn't get that.";
-      setMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
-      speak(botReply);
+      const speakBuffered = (buffer) => {
+        if (!buffer || !selectedVoice) return;
+        const utterance = new SpeechSynthesisUtterance(buffer);
+        utterance.voice = selectedVoice;
+        utterance.pitch = 1.1;
+        utterance.rate = 0.95;
+        utterance.volume = 1.0;
+        speechSynthesis.cancel();
+        setIsBotSpeaking(true);
+        utterance.onend = () => setIsBotSpeaking(false);
+        speechSynthesis.speak(utterance);
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+
+// Try to parse JSON if it's a full object
+try {
+  const parsed = JSON.parse(chunk);
+  if (parsed.response) {
+    botText += parsed.response;
+  } else {
+    botText += chunk; // fallback
+  }
+} catch {
+  botText += chunk; // fallback for partial or non-JSON chunks
+}
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { sender: "bot", text: botText };
+          return updated;
+        });
+        const sentenceEnd = botText.lastIndexOf(".");
+        if (sentenceEnd > spokenSoFar.length + 5) {
+          const toSpeak = botText.slice(spokenSoFar.length, sentenceEnd + 1);
+          spokenSoFar += toSpeak;
+          speakBuffered(toSpeak);
+        }
+      }
+
+      const remaining = botText.slice(spokenSoFar.length).trim();
+      if (remaining.length > 2) speakBuffered(remaining);
     } catch {
       const errorMsg = "Error: Could not reach server.";
       setMessages((prev) => [...prev, { sender: "bot", text: errorMsg }]);
       speak(errorMsg);
     }
-
     setLoading(false);
   };
 
@@ -96,7 +134,6 @@ function ChatInterface() {
     }
   };
 
-  // Speech-to-Text
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -104,29 +141,22 @@ function ChatInterface() {
       alert("Speech recognition not supported in this browser.");
       return;
     }
-
     const recog = new SpeechRecognition();
     recog.continuous = false;
     recog.interimResults = false;
     recog.lang = "en-US";
-
     recog.onstart = () => setIsListening(true);
     recog.onend = () => setIsListening(false);
-
     recog.onresult = (event) => {
       const speechText = event.results[0][0].transcript;
       sendMessage(speechText);
     };
-
     recognitionRef.current = recog;
   }, []);
 
   const toggleListening = () => {
-    if (isListening) {
-      recognitionRef.current.stop();
-    } else {
-      recognitionRef.current.start();
-    }
+    if (isListening) recognitionRef.current.stop();
+    else recognitionRef.current.start();
   };
 
   const waveformBars = (
@@ -147,21 +177,14 @@ function ChatInterface() {
 
   return (
     <div className="flex flex-col h-[85vh] bg-[#f8f9fa] rounded-lg shadow p-4 max-w-2xl mx-auto">
-      {/* Chat Area */}
       <div className="flex-1 overflow-y-auto px-2 pb-4">
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`flex mb-4 ${
-              msg.sender === "user" ? "justify-end" : "justify-start"
-            }`}
+            className={`flex mb-4 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
           >
             {msg.sender === "bot" && (
-              <img
-                src={botAvatar}
-                alt="Bot"
-                className="w-8 h-8 rounded-full mr-2 self-end"
-              />
+              <img src={botAvatar} alt="Bot" className="w-8 h-8 rounded-full mr-2 self-end" />
             )}
             <div
               className={`relative max-w-[70%] px-4 py-2 rounded-xl shadow-sm ${
@@ -196,18 +219,13 @@ function ChatInterface() {
               </button>
             </div>
             {msg.sender === "user" && (
-              <img
-                src={userAvatar}
-                alt="You"
-                className="w-8 h-8 rounded-full ml-2 self-end"
-              />
+              <img src={userAvatar} alt="You" className="w-8 h-8 rounded-full ml-2 self-end" />
             )}
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Voice Selector */}
       <div className="flex items-center gap-2 mt-2 text-sm">
         <label htmlFor="voiceSelect" className="text-gray-700 font-medium">
           Voice:
@@ -230,7 +248,6 @@ function ChatInterface() {
         </select>
       </div>
 
-      {/* Input Area */}
       <form
         className="flex items-center gap-2 border-t pt-3 bg-white rounded-b-lg"
         onSubmit={(e) => {
@@ -248,7 +265,6 @@ function ChatInterface() {
           disabled={loading}
         />
 
-        {/* Mic Button */}
         <button
           type="button"
           onClick={toggleListening}
@@ -270,7 +286,6 @@ function ChatInterface() {
           </svg>
         </button>
 
-        {/* Waveform */}
         {(isListening || isBotSpeaking) && waveformBars}
 
         <button
