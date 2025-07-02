@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import moodmateLogo from "../assets/moodmate-logo.png";
 import { Link } from "react-router-dom";
 import {
@@ -24,13 +24,22 @@ const menuItems = [
   { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' } // ✅ Correct icon + path
 ];
 
+
+
 export default function Sidebar({ isCollapsed, setIsCollapsed }) {
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+  return localStorage.getItem('theme') === 'dark';
+});
+
+  useEffect(() => {
+  document.documentElement.classList.toggle('dark', darkMode);
+  localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+}, [darkMode]);
   const [activeItem, setActiveItem] = useState('Posts');
 
   return (
-    <div className={`fixed top-0 left-0 h-screen bg-white shadow-md p-4 flex flex-col justify-between transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`} style={{ height: '100vh' }}>
-      <div className="h-screen bg-white shadow-md p-4 flex flex-col justify-between transition-all duration-300">
+    <div className={`fixed top-0 left-0 h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 shadow-md p-4 flex flex-col justify-between transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+      <div className="h-screen bg-white dark:bg-gray-900 shadow-md p-4 flex flex-col justify-between transition-all duration-300">
         <div>
           <div className="flex items-center justify-between mb-8">
             <div className={`text-xl font-bold text-blue-600 flex items-center gap-2 transition-all ${isCollapsed ? 'justify-center w-full' : ''}`}>
@@ -55,8 +64,11 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                 key={label}
                 onClick={() => setActiveItem(label)}
                 className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${
-                  activeItem === label ? 'bg-blue-100 text-blue-600 font-semibold' : 'text-gray-600 hover:bg-gray-100'
+                  activeItem === label
+                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-semibold'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
+
               >
                 <Link to={path} className="flex items-center gap-3 w-full">
                   {icon}

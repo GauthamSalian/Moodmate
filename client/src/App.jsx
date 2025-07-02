@@ -29,7 +29,7 @@ function App() {
     <Router>
       <div className="flex">
         <Sidebar isCollapsed={isSidebarCollapsed} setIsCollapsed={setIsSidebarCollapsed} />
-        <div className={`flex-1 p-6 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+        <div className={`flex-1 p-6 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100`}>
           <Routes>
             <Route path="/chat" element={<ChatInterface />} />
             <Route path="/chatbot/*" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />

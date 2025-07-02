@@ -176,7 +176,7 @@ try {
   );
 
   return (
-    <div className="flex flex-col h-[85vh] bg-[#f8f9fa] rounded-lg shadow p-4 max-w-2xl mx-auto">
+    <div className="flex flex-col h-[85vh] bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 rounded-lg shadow p-4 max-w-2xl mx-auto transition-colors duration-300">
       <div className="flex-1 overflow-y-auto px-2 pb-4">
         {messages.map((msg, idx) => (
           <div
@@ -189,8 +189,8 @@ try {
             <div
               className={`relative max-w-[70%] px-4 py-2 rounded-xl shadow-sm ${
                 msg.sender === "user"
-                  ? "bg-white text-gray-900 border border-gray-200"
-                  : "bg-[#f4f8ff] text-gray-900 border-l-4 border-blue-400"
+                  ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700"
+                  : "bg-[#f4f8ff] dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-l-4 border-blue-400"
               }`}
             >
               {msg.text}
@@ -232,7 +232,7 @@ try {
         </label>
         <select
           id="voiceSelect"
-          className="border px-2 py-1 rounded text-sm"
+          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-2 py-1 rounded text-sm"
           onChange={(e) =>
             setSelectedVoice(
               availableVoices.find((v) => v.name === e.target.value)
@@ -249,14 +249,14 @@ try {
       </div>
 
       <form
-        className="flex items-center gap-2 border-t pt-3 bg-white rounded-b-lg"
+        className="flex items-center gap-2 border-t border-gray-200 dark:border-gray-700 pt-3 bg-white dark:bg-gray-900 rounded-b-lg transition-colors duration-300"
         onSubmit={(e) => {
           e.preventDefault();
           sendMessage();
         }}
       >
         <textarea
-          className="flex-1 resize-none border-none outline-none p-2 bg-transparent"
+          className="flex-1 resize-none border-none outline-none p-2 bg-transparent text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
           rows={1}
           placeholder="Type a new message here"
           value={input}
@@ -269,7 +269,7 @@ try {
           type="button"
           onClick={toggleListening}
           className={`p-2 rounded-full ${
-            isListening ? "bg-red-100" : "hover:bg-gray-100"
+            isListening ? "bg-red-100 dark:bg-red-200" : "hover:bg-gray-100 dark:hover:bg-gray-800"
           }`}
           title={isListening ? "Stop Listening" : "Start Voice Input"}
         >
@@ -290,7 +290,7 @@ try {
 
         <button
           type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
           disabled={loading || !input.trim()}
         >
           {loading ? "..." : "Send"}
