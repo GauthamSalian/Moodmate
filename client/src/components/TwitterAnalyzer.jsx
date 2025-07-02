@@ -132,7 +132,7 @@ const TwitterAnalyzer = () => {
           {twitterResults.map((tweet, idx) => (
             <tr key={idx} className="border-b last:border-none hover:bg-gray-100 transition">
               <td className="py-2 px-4 whitespace-nowrap text-gray-700 font-mono">{format(new Date(tweet.date), "PPpp")}</td>
-              <td className="py-2 px-4 max-w-xs truncate">{tweet.text}</td>
+              <td className="py-2 px-4 whitespace-pre-wrap break-words">{tweet.text}</td>
               <td className="py-2 px-4">
                 {tweet.risk_detected === "Yes" ? (
                   <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full font-semibold text-xs">Risk</span>
