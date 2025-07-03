@@ -9,6 +9,7 @@ import TwitterAnalyzer from './components/TwitterAnalyzer';
 import ChatInterface from './components/ChatInterface';
 import BookingPage from './pages/BookingPage';
 import GoogleFitAuth from './components/GoogleFitAuth'; // ✅ Correct path
+import BreathingCatalog from './components/BreathingCatalog';
 
 function App() {
   const [fusionInputs, setFusionInputs] = useState({
@@ -40,6 +41,7 @@ function App() {
             <Route path="/book" element={<BookingPage />} />
             <Route path="/" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
             <Route path="/sleep" element={<GoogleFitAuth onDataFetched={(data) => setFusionInputs(prev => ({ ...prev, ...data }))} />} />
+            <Route path="/library" element={<BreathingCatalog />} />
           </Routes>
         </div>
       </div>

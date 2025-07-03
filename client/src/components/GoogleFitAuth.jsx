@@ -7,7 +7,7 @@ const SCOPES = [
 ].join(" ");
 
 function GoogleFitAuth({ onDataFetched }) {
-  const [status, setStatus] = useState("loading"); // loading, success, error
+  const [status, setStatus] = useState("loading");
   const [sleep, setSleep] = useState(null);
   const [hrv, setHrv] = useState(null);
 
@@ -71,42 +71,40 @@ function GoogleFitAuth({ onDataFetched }) {
         onDataFetched({ sleep: totalSleepHrs, hrv: avgHRV });
       }
     } catch (err) {
+      console.error(err);
       setStatus("error");
     }
   };
 
-  const loadGoogleAuth = () => {
-    window.gapi.load('client:auth2', () => {
-      window.gapi.client.init({
-        clientId: CLIENT_ID,
-        scope: SCOPES
-      }).then(() => {
-        const auth = window.gapi.auth2.getAuthInstance();
-        auth.signIn().then(user => {
-          const token = user.getAuthResponse().access_token;
-          fetchGoogleFitData(token);
-        }).catch(() => setStatus("error"));
-      });
-    });
-  };
-
   useEffect(() => {
-    setStatus("loading");
     const script = document.createElement("script");
-    script.src = "https://apis.google.com/js/api.js";
-    script.onload = loadGoogleAuth;
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (response) => {
+          if (response.access_token) {
+            fetchGoogleFitData(response.access_token);
+          } else {
+            setStatus("error");
+          }
+        }
+      });
+      tokenClient.requestAccessToken();
+    };
     document.body.appendChild(script);
-    // eslint-disable-next-line
   }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl shadow-lg p-8 flex flex-col items-center relative overflow-hidden transition-colors duration-300">
-        {/* Animated Google Fit Icon */}
         <div className="mb-6">
           <svg className={`animate-spin-slow ${status === "success" ? "text-green-400" : "text-blue-500"}`} width="64" height="64" viewBox="0 0 64 64" fill="none">
-            <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="8" opacity="0.2"/>
-            <path d="M32 4a28 28 0 1 1-19.8 47.8" stroke="currentColor" strokeWidth="8" strokeLinecap="round"/>
+            <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="8" opacity="0.2" />
+            <path d="M32 4a28 28 0 1 1-19.8 47.8" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
           </svg>
         </div>
         <h2 className="text-2xl font-bold mb-2 text-blue-700">Google Fit Authorization</h2>
@@ -146,7 +144,6 @@ function GoogleFitAuth({ onDataFetched }) {
           </div>
         )}
       </div>
-      {/* Animations */}
       <style>{`
         .animate-spin-slow {
           animation: spin 2s linear infinite;
