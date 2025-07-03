@@ -4,10 +4,11 @@ import { Chart, Filler } from "chart.js";
 Chart.register(Filler);
 import { format } from "date-fns";
 
-
 const TwitterAnalyzer = () => {
   const [twitterUsername, setTwitterUsername] = useState("");
   const [twitterResults, setTwitterResults] = useState(null);
+  const [wordCloudData, setWordCloudData] = useState(null);
+  const [selectedEmotion, setSelectedEmotion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const chartRef = useRef();
@@ -26,7 +27,7 @@ const TwitterAnalyzer = () => {
         borderColor: "#00BFFF",
         backgroundColor: function(context) {
           const chart = context.chart;
-          const {ctx, chartArea} = chart;
+          const { ctx, chartArea } = chart;
           if (!chartArea) return null;
           const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
           gradient.addColorStop(0, "rgba(0,191,255,0.4)");
@@ -63,10 +64,12 @@ const TwitterAnalyzer = () => {
     setError("");
     setTwitterResults(null);
     try {
-      const res = await fetch(`http://localhost:8000/analyze_tweets/${twitterUsername}`);
+      const res = await fetch(`http://localhost:8000/analyze_all/${twitterUsername}`);
       const data = await res.json();
-      if (data.results) {
-        setTwitterResults(data.results);
+      if (data.risk_analysis) {
+        setTwitterResults(data.risk_analysis);
+        setWordCloudData(data.wordcloud);
+        setSelectedEmotion(""); // reset emotion selection
       } else {
         setError(data.error || "No results found.");
       }
@@ -77,11 +80,11 @@ const TwitterAnalyzer = () => {
   };
 
   useEffect(() => {
-  if (chartRef.current) {
-    setRedraw(true);
-    setTimeout(() => setRedraw(false), 0); // reset for next time
-  }
-}, [twitterResults]);
+    if (chartRef.current) {
+      setRedraw(true);
+      setTimeout(() => setRedraw(false), 0);
+    }
+  }, [twitterResults]);
 
   return (
     <div className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-4 rounded shadow transition-colors duration-300">
@@ -102,6 +105,7 @@ const TwitterAnalyzer = () => {
       </button>
       {loading && <div className="text-blue-500 mt-2">Loading...</div>}
       {error && <div className="text-red-500 mt-2">{error}</div>}
+
       {twitterResults && (
         <div className="mt-8 bg-white dark:bg-gray-800 p-4 rounded shadow transition-colors duration-300" style={{ maxWidth: 800, margin: "0 auto" }}>
           <h4 className="font-semibold mb-2">Twitter Risk Over Time</h4>
@@ -115,39 +119,96 @@ const TwitterAnalyzer = () => {
           />
         </div>
       )}
+
       {twitterResults && (
-  <div className="mt-4">
-    <h4 className="font-semibold mb-2">Results:</h4>
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-sm overflow-x-auto transition-colors duration-300">
-      <table className="border-b last:border-none hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-        <thead>
-          <tr className="text-left text-gray-500 font-semibold border-b">
-            <th className="py-2 px-4">Date & Time</th>
-            <th className="py-2 px-4">Content</th>
-            <th className="py-2 px-4">Status</th>
-            <th className="py-2 px-4">Probability</th>
-          </tr>
-        </thead>
-        <tbody>
-          {twitterResults.map((tweet, idx) => (
-            <tr key={idx} className="border-b last:border-none hover:bg-gray-100 transition">
-              <td className="py-2 px-4 whitespace-nowrap text-gray-700 font-mono">{format(new Date(tweet.date), "PPpp")}</td>
-              <td className="py-2 px-4 whitespace-pre-wrap break-words">{tweet.text}</td>
-              <td className="py-2 px-4">
-                {tweet.risk_detected === "Yes" ? (
-                  <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full font-semibold text-xs">Risk</span>
-                ) : (
-                  <span className="bg-green-100 text-green-600 px-3 py-1 rounded-full font-semibold text-xs">Safe</span>
-                )}
-              </td>
-              <td className="py-2 px-4 font-semibold">{Number(tweet.probability_of_risk).toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-)}
+        <div className="mt-4">
+          <h4 className="font-semibold mb-2">Results:</h4>
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-sm overflow-x-auto transition-colors duration-300">
+            <table className="border-b last:border-none hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+              <thead>
+                <tr className="text-left text-gray-500 font-semibold border-b">
+                  <th className="py-2 px-4">Date & Time</th>
+                  <th className="py-2 px-4">Content</th>
+                  <th className="py-2 px-4">Status</th>
+                  <th className="py-2 px-4">Probability</th>
+                </tr>
+              </thead>
+              <tbody>
+                {twitterResults.map((tweet, idx) => (
+                  <tr key={idx} className="border-b last:border-none hover:bg-gray-100 transition">
+                    <td className="py-2 px-4 whitespace-nowrap text-gray-700 font-mono">{format(new Date(tweet.date), "PPpp")}</td>
+                    <td className="py-2 px-4 whitespace-pre-wrap break-words">{tweet.text}</td>
+                    <td className="py-2 px-4">
+                      {(() => {
+                        const prob = Number(tweet.probability_of_risk);
+                        let label = "", color = "";
+
+                        if (prob >= 0.8) {
+                          label = "Very High";
+                          color = "bg-red-200 text-red-800";
+                        } else if (prob >= 0.6) {
+                          label = "High";
+                          color = "bg-orange-200 text-orange-800";
+                        } else if (prob >= 0.4) {
+                          label = "Moderate";
+                          color = "bg-yellow-200 text-yellow-800";
+                        } else if (prob >= 0.2) {
+                          label = "Low";
+                          color = "bg-green-200 text-green-800";
+                        } else {
+                          label = "Very Low";
+                          color = "bg-blue-200 text-blue-800";
+                        }
+
+                        return (
+                          <span className={`whitespace-nowrap px-3 py-1 rounded-full font-semibold text-xs ${color}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="py-2 px-4 font-semibold">{Number(tweet.probability_of_risk).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {wordCloudData && Object.keys(wordCloudData).length > 0 && (
+        <div className="mt-8">
+          <h4 className="font-semibold mb-2">Emotion Word Cloud</h4>
+          <div className="mb-4">
+            <label className="block mb-1 text-sm">Select an emotion:</label>
+            <select
+              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-2 py-1 rounded"
+              value={selectedEmotion}
+              onChange={(e) => setSelectedEmotion(e.target.value)}
+            >
+              <option value="">-- Choose an emotion --</option>
+              {Object.keys(wordCloudData).map((emotion) => (
+                <option key={emotion} value={emotion}>{emotion}</option>
+              ))}
+            </select>
+          </div>
+          {selectedEmotion && (
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded shadow-sm">
+              <h5 className="text-md font-medium mb-2">Top Words for: {selectedEmotion}</h5>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(wordCloudData[selectedEmotion]).map(([word, count]) => (
+                  <span
+                    key={word}
+                    className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-sm"
+                  >
+                    {word} ({count})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

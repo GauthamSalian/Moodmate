@@ -163,3 +163,29 @@ def generate_wordcloud_data(username: str, max_results: int = 10):
         return {"wordcloud": wordcloud_data}
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/analyze_all/{username}")
+def analyze_all(username: str, max_results: int = 5):
+    try:
+        user_id = get_user_id(username)
+        tweets = get_user_tweets(user_id, max_results=max_results)
+
+        tweet_data = [{"date": tweet["created_at"], "text": tweet["text"]} for tweet in tweets]
+
+        results = []
+        for tweet in tweet_data:
+            result = analyze_tweet(tweet["text"])
+            results.append({
+                "date": tweet["date"],
+                "text": tweet["text"],
+                **result
+            })
+
+        wordcloud_data = extract_emotion_words(tweet_data)
+
+        return {
+            "risk_analysis": results,
+            "wordcloud": wordcloud_data
+        }
+    except Exception as e:
+        return {"error": str(e)}
