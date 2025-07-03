@@ -15,11 +15,17 @@ function Chatbot() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/chatbot', {
+      const response = await fetch('http://localhost:5000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({
+          user_input: {
+            message: input
+          }
+        })
       });
+
+
       const data = await response.json();
       const botMessage = { type: 'bot', text: data.response };
       setMessages(prev => [...prev, botMessage]);

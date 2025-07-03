@@ -84,15 +84,15 @@ const StressDashboard = ({ fusionInputs }) => {
 };
 
   return (
-    <div className="ml-64 p-6">
+    <div className="ml-64 p-6 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-300">
       <h2 className="text-2xl font-bold mb-4">📊 Stress Fusion Dashboard</h2>
-      <div className="bg-white p-4 rounded shadow space-y-4">
+      <div className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 p-4 rounded shadow space-y-4 transition-colors duration-300">
         <p className="text-lg">🧠 Fusion Stress Score (Live)</p>
         <Line data={chartData} options={options} />
 
         <div className="mt-4">
           <h3 className="text-lg font-semibold">Latest Scores:</h3>
-          <ul className="list-disc ml-5 text-sm">
+          <ul className="list-disc ml-5 text-sm text-gray-700 dark:text-gray-200">
             {Object.entries(fusionInputs).map(([key, val]) => (
               <li key={key}>{key.toUpperCase()}: {val !== null ? val.toFixed(2) : 'Not captured'}</li>
             ))}

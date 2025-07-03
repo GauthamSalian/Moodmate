@@ -101,7 +101,7 @@ function GoogleFitAuth({ onDataFetched }) {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8 flex flex-col items-center relative overflow-hidden">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl shadow-lg p-8 flex flex-col items-center relative overflow-hidden transition-colors duration-300">
         {/* Animated Google Fit Icon */}
         <div className="mb-6">
           <svg className={`animate-spin-slow ${status === "success" ? "text-green-400" : "text-blue-500"}`} width="64" height="64" viewBox="0 0 64 64" fill="none">

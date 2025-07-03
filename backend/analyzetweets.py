@@ -3,14 +3,20 @@ import torch
 import re
 import json
 import requests
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from collections import defaultdict, Counter
 from dotenv import load_dotenv
 load_dotenv()
 BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
 print("BEARER_TOKEN:", "Loaded" if BEARER_TOKEN else "Missing or Empty")
 
+emotion_analyzer = pipeline(
+    "text-classification",
+    model="j-hartmann/emotion-english-distilroberta-base",
+    #top_k=1
+)
 
 model_path_name = "ibm-granite/granite-guardian-3.2-3b-a800m"
 safe_token = "No"
@@ -98,6 +104,35 @@ def analyze_tweet(text):
         "probability_of_risk": prob_risk
     }
 
+def extract_emotion_words(tweets):
+    emotion_counts = defaultdict(Counter)
+    for tweet in tweets:
+        text = tweet["text"]
+        try:
+            result = emotion_analyzer(text)
+            if isinstance(result, list) and isinstance(result[0], list):
+                result = result[0]
+            emotion = result[0]["label"]
+            if emotion.lower() == "neutral":
+                continue
+        except Exception as e:
+            print(f"Emotion analysis failed for tweet: {text}\nError: {e}")
+            continue
+
+        words = [
+            word.strip("#@,.!?").lower()
+            for word in text.split()
+            if len(word) > 2
+        ]
+        for word in words:
+            emotion_counts[emotion][word] += 1
+
+    return {
+        emotion: dict(counter.most_common(30))
+        for emotion, counter in emotion_counts.items()
+    }
+
+
 @app.get("/analyze_tweets/{username}")
 def analyze_tweets(username: str, max_results: int = 5):
     try:
@@ -115,5 +150,42 @@ def analyze_tweets(username: str, max_results: int = 5):
         if not results:
             return {"error": "Try again later"}
         return {"results": results}
+    except Exception as e:
+        return {"error": str(e)}
+    
+@app.get("/wordcloud_data/{username}")
+def generate_wordcloud_data(username: str, max_results: int = 10):
+    try:
+        user_id = get_user_id(username)
+        tweets = get_user_tweets(user_id, max_results=max_results)
+        tweet_data = [{"text": tweet["text"]} for tweet in tweets]
+        wordcloud_data = extract_emotion_words(tweet_data)
+        return {"wordcloud": wordcloud_data}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/analyze_all/{username}")
+def analyze_all(username: str, max_results: int = 5):
+    try:
+        user_id = get_user_id(username)
+        tweets = get_user_tweets(user_id, max_results=max_results)
+
+        tweet_data = [{"date": tweet["created_at"], "text": tweet["text"]} for tweet in tweets]
+
+        results = []
+        for tweet in tweet_data:
+            result = analyze_tweet(tweet["text"])
+            results.append({
+                "date": tweet["date"],
+                "text": tweet["text"],
+                **result
+            })
+
+        wordcloud_data = extract_emotion_words(tweet_data)
+
+        return {
+            "risk_analysis": results,
+            "wordcloud": wordcloud_data
+        }
     except Exception as e:
         return {"error": str(e)}

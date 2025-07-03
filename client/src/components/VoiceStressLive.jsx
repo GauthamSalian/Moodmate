@@ -54,7 +54,7 @@ function VoiceStressLive({ onVoiceStress }) {
   }, [onVoiceStress]);
 
   return (
-    <div className="bg-white p-4 rounded shadow mt-4">
+    <div className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 p-4 rounded shadow transition-colors duration-300">
       <h3 className="text-lg font-bold">🎤 Voice Stress Analyzer (Live)</h3>
       <p className="text-sm text-gray-500">Analyzing your voice stress in real time...</p>
     </div>
