@@ -20,30 +20,54 @@ const JournalDashboard = () => {
   const [savedEntry, setSavedEntry] = useState(null);
   const [wordEmotions, setWordEmotions] = useState([]);
   const [entries, setEntries] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [entryId, setEntryId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const prompt = "How was your day? What emotions stood out?";
 
   useEffect(() => {
     fetch("http://localhost:8000/journal-entries")
       .then((res) => res.json())
-      .then((data) => setEntries(data));
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setEntries(data);
+        } else {
+          console.error("Expected array but got:", data);
+          setEntries([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching entries:", err);
+        setEntries([]);
+      });
   }, [savedEntry]);
 
   const handleSave = async () => {
-    const response = await fetch("http://localhost:8000/journal-entry", {
-      method: "POST",
+    const formattedDate = selectedDate.toISOString().split("T")[0];
+    const method = isEditing ? "PUT" : "POST";
+    const url = isEditing
+      ? `http://localhost:8000/journal-entry/${entryId}`
+      : "http://localhost:8000/journal-entry";
+
+    const response = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: entry.replace(/[^\x20-\x7E]/g, ""),
-        date: new Date().toISOString().split("T")[0],
+        date: formattedDate,
       }),
     });
+
     const data = await response.json();
     setSavedEntry(data);
     setWordEmotions(data.word_emotions);
     setEntry("");
     setCharCount(0);
+    setIsEditing(false);
+    setEntryId(data.id);
   };
+
 
   const handleDelete = () => {
     setEntry("");
@@ -91,6 +115,34 @@ const JournalDashboard = () => {
     });
   };
 
+  const fetchEntryByDate = async (date) => {
+    const formattedDate = date.toISOString().split("T")[0];
+    console.log("Fetching for date:", formattedDate);
+    setSelectedDate(date);
+    try {
+      const res = await fetch(`http://localhost:8000/journal-entry/by-date?date=${formattedDate}`);
+      if (!res.ok) {
+        // No entry for this date
+        setSavedEntry(null);
+        setWordEmotions([]);
+        setEntry("");
+        setEntryId(null);
+        setIsEditing(false);
+        return;
+      }
+      const data = await res.json();
+      setSavedEntry(data);
+      setWordEmotions(data.word_emotions);
+      setEntryId(data.id);
+      setIsEditing(true);
+      setEntry(data.text); // Pre-fill text area for editing
+      setCharCount(data.text.length);
+    } catch (err) {
+      console.error("Error fetching entry:", err);
+    }
+  };
+
+
   return (
     <div className="w-full h-screen p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Journal Entry Panel */}
@@ -131,12 +183,41 @@ const JournalDashboard = () => {
             </div>
 
             {savedEntry?.dominant_emotion && (
-              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-lg shadow-inner">
-                🎯 <strong>Dominant Emotion:</strong>{" "}
-                {savedEntry.dominant_emotion.charAt(0).toUpperCase() +
-                  savedEntry.dominant_emotion.slice(1)}
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-lg shadow-inner space-y-1">
+                <div>
+                  🎯 <strong>Dominant Emotion:</strong>{" "}
+                  {savedEntry.dominant_emotion.charAt(0).toUpperCase() +
+                    savedEntry.dominant_emotion.slice(1)}
+                </div>
+                <div>
+                  🔍 <strong>Score:</strong> {savedEntry.dominant_score?.toFixed(3) ?? "N/A"}
+                </div>
               </div>
             )}
+
+          {savedEntry?.all_emotions && (
+            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 rounded-lg shadow-inner">
+              <h3 className="font-semibold mb-2">📊 All Emotion Scores</h3>
+              <ul className="space-y-1">
+                <ul className="space-y-1">
+                  {savedEntry.all_emotions.map(({ emotion, score }) => (
+                    <li key={emotion}>
+                      <span
+                        style={{
+                          color: emotionColors[emotion] || "inherit",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+                      </span>
+                      {": "}
+                      <span>{Number(score).toFixed(3)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ul>
+            </div>
+          )}
 
             <div className="flex gap-2 mt-4">
               <button
@@ -155,7 +236,10 @@ const JournalDashboard = () => {
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
           Emotion Calendar
         </h2>
-        <Calendar tileContent={tileContent} />
+        <Calendar
+          tileContent={tileContent}
+          onClickDay={fetchEntryByDate}
+        />
       </div>
     </div>
   );
