@@ -23,6 +23,7 @@ const JournalDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entryId, setEntryId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isViewing, setIsViewing] = useState(false);
 
   const prompt = "How was your day? What emotions stood out?";
 
@@ -128,13 +129,15 @@ const JournalDashboard = () => {
         setEntry("");
         setEntryId(null);
         setIsEditing(false);
+        setIsViewing(true);
         return;
       }
       const data = await res.json();
       setSavedEntry(data);
       setWordEmotions(data.word_emotions);
       setEntryId(data.id);
-      setIsEditing(true);
+      setIsEditing(false);
+      setIsViewing(true);
       setEntry(data.text); // Pre-fill text area for editing
       setCharCount(data.text.length);
     } catch (err) {
@@ -150,7 +153,7 @@ const JournalDashboard = () => {
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
           Daily Journal
         </h2>
-        {!savedEntry ? (
+        {!savedEntry || isEditing ? (
           <>
             <p className="text-sm text-gray-500 italic mb-2">{prompt}</p>
             <textarea
@@ -174,12 +177,45 @@ const JournalDashboard = () => {
               >
                 Save
               </button>
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  setIsViewing(true);
+                  setEntry(savedEntry.text); // Reset entry
+                  setCharCount(savedEntry.text.length);
+                }}
+                className="px-4 py-2 bg-gray-500 text-white rounded-xl hover:bg-gray-600 ml-2"
+              >
+                Cancel
+              </button>
             </div>
           </>
         ) : (
           <>
             <div className="bg-gray-100 dark:bg-gray-900 p-3 rounded-lg text-gray-800 dark:text-gray-100">
               {renderColoredSentence()}
+              {isViewing && !isEditing && (
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => {
+                      setIsEditing(true);
+                      setIsViewing(false);
+                      setEntry(savedEntry.text);
+                      setCharCount(savedEntry.text.length);
+                    }}
+                    className="px-4 py-2 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600"
+                  >
+                    ✏️ Edit
+                  </button>
+
+                  <button
+                    onClick={handleDelete}
+                    className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              )}
             </div>
 
             {savedEntry?.dominant_emotion && (
@@ -218,15 +254,6 @@ const JournalDashboard = () => {
               </ul>
             </div>
           )}
-
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600"
-              >
-                Delete
-              </button>
-            </div>
           </>
         )}
       </div>
