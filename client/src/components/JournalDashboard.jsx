@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
+import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from "date-fns";
 
 const emotionColors = {
   joy: "#FFD700",
@@ -25,6 +26,9 @@ const JournalDashboard = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
   const [reflectionMessage, setReflectionMessage] = useState("");
+  const [showSuggestion, setShowSuggestion] = useState(false);
+  const [suggestedPrompt, setSuggestedPrompt] = useState("");
+  const [safeMode, setSafeMode] = useState(false);
 
   const prompt = "How was your day? What emotions stood out?";
 
@@ -118,27 +122,74 @@ const JournalDashboard = () => {
     });
   };
 
-  const generateReflection = (dominantEmotion) => {
-    switch (dominantEmotion) {
-      case "joy":
-        return "It's wonderful to see you're feeling joyful! Keep cherishing those positive moments.";
-      case "sadness":
-        return "It's okay to feel sad sometimes. Reflecting helps in healing.";
-      case "anger":
-        return "Anger can be powerful—remember to channel it constructively.";
+  const getWeeklyEntryCount = () => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+
+    return entries.filter((entry) =>
+      isWithinInterval(parseISO(entry.date), { start: weekStart, end: weekEnd })
+    ).length;
+  };
+
+  const generateWeeklyEncouragement = () => {
+    const count = getWeeklyEntryCount();
+    if (count === 0) return null;
+
+    let emoji = "🌱";
+    if (count >= 5) emoji = "🌼";
+    else if (count >= 3) emoji = "🌿";
+
+    return `This is your ${count}${getOrdinal(count)} journal this week ${emoji} Keep caring for your mind.`;
+  };
+
+  const getOrdinal = (n) => {
+    if (n === 1) return "st";
+    if (n === 2) return "nd";
+    if (n === 3) return "rd";
+    return "th";
+  };
+
+
+
+  const getPromptSuggestion = (emotion) => {
+    switch (emotion) {
       case "fear":
-        return "Facing your fears is a brave step. Be kind to yourself.";
-      case "surprise":
-        return "Surprises can be exciting or overwhelming. Take a moment to process.";
+        return "Write about something or someone that made you feel safe recently.";
+      case "sadness":
+        return "Is there a moment of calm or hope you’ve experienced this week?";
+      case "anger":
+        return "What do you wish others understood about how you feel?";
+      case "joy":
+        return "What brought you joy today, even in a small way?";
       case "calm":
-        return "Feeling calm is a sign of balance. Embrace the peace.";
-      case "neutral":
-        return "A neutral day offers rest and grounding. That’s valuable too.";
+        return "Describe a moment that helped you stay grounded.";
       default:
-        return "Thanks for sharing your thoughts today.";
+        return "Reflect on something that stood out to you today.";
     }
   };
 
+
+  const generateReflection = (dominantEmotion) => {
+    switch (dominantEmotion) {
+      case "joy":
+        return "It's beautiful to see joy in your day. Hold onto that brightness. 💛";
+      case "sadness":
+        return "Gentle sadness is okay — you're allowed to feel deeply. 🌧️";
+      case "anger":
+        return "Frustration shows you care — take a moment to breathe and reflect. ❤️‍🔥";
+      case "fear":
+        return "It’s brave to express fear. Let's face it together, one step at a time. 🌙";
+      case "surprise":
+        return "Something caught you off guard — it's okay to feel shaken or curious.";
+      case "calm":
+        return "You seem to be in a peaceful space today. Treasure this balance. 🌿";
+      case "neutral":
+        return "Even a quiet, neutral day holds value. Rest is healing. 🧘";
+      default:
+        return "Thank you for sharing your thoughts — that takes courage.";
+    }
+  };
 
   const fetchEntryByDate = async (date) => {
     const formattedDate = date.toISOString().split("T")[0];
@@ -242,40 +293,75 @@ const JournalDashboard = () => {
               )}
             </div>
 
-            {savedEntry?.dominant_emotion && (
+            {!safeMode && savedEntry?.dominant_emotion && (
               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-lg shadow-inner space-y-1">
                 <div>
-                  🎯 <strong>Dominant Emotion:</strong>{" "}
-                  {savedEntry.dominant_emotion.charAt(0).toUpperCase() +
-                    savedEntry.dominant_emotion.slice(1)}
+                  🌿 <strong>Today, you might be feeling:</strong>{" "}
+                  <span style={{ color: emotionColors[savedEntry.dominant_emotion], fontWeight: 600 }}>
+                    {savedEntry.dominant_emotion.charAt(0).toUpperCase() + savedEntry.dominant_emotion.slice(1)}
+                  </span>
                 </div>
-                <div>
-                  🔍 <strong>Score:</strong> {savedEntry.dominant_score?.toFixed(3) ?? "N/A"}
+                <div className="text-sm italic text-gray-500 dark:text-gray-400">
+                  This feeling came through quite clearly in your entry.
                 </div>
               </div>
             )}
 
-          {savedEntry?.all_emotions && (
+          {!safeMode && savedEntry?.all_emotions && (
             <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 rounded-lg shadow-inner">
               <h3 className="font-semibold mb-2">📊 All Emotion Scores</h3>
               <ul className="space-y-1">
                 <ul className="space-y-1">
                   {savedEntry.all_emotions.map(({ emotion, score }) => (
                     <li key={emotion}>
-                      <span
-                        style={{
-                          color: emotionColors[emotion] || "inherit",
-                          fontWeight: 600,
-                        }}
-                      >
+                      <span style={{ color: emotionColors[emotion] || "inherit", fontWeight: 600 }}>
                         {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
                       </span>
                       {": "}
-                      <span>{Number(score).toFixed(3)}</span>
+                      <span>
+                        {Number(score) > 0.75
+                          ? "strongly felt"
+                          : Number(score) > 0.4
+                          ? "gently present"
+                          : "faint"}
+                      </span>
                     </li>
                   ))}
                 </ul>
               </ul>
+            </div>
+          )}
+
+          {!safeMode && savedEntry.dominant_emotion === "fear" && (
+            <div className="mt-2 text-sm text-purple-800 dark:text-purple-200 italic">
+              You're strong for expressing your fears. Would you like to try a breathing break? 🌬️
+            </div>
+          )}
+
+          {!safeMode && savedEntry.dominant_emotion === "anger" && (
+            <div className="mt-2 text-sm text-red-700 dark:text-red-300 italic">
+              It's okay to feel frustration — it means something matters to you. ❤️
+            </div>
+          )}
+
+          {!safeMode && savedEntry?.dominant_emotion && (
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={() => {
+                  const suggestion = getPromptSuggestion(savedEntry.dominant_emotion);
+                  setSuggestedPrompt(suggestion);
+                  setShowSuggestion(true);
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 text-sm"
+              >
+                🧠 Suggest a reflective prompt
+              </button>
+
+              {!safeMode && showSuggestion && (
+                <div className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 p-3 rounded-xl shadow-inner mt-2 text-sm">
+                  ✨ <em>{suggestedPrompt}</em>
+                </div>
+              )}
             </div>
           )}
           </>
@@ -296,11 +382,31 @@ const JournalDashboard = () => {
           />
         </div>
 
+        <div className="mb-4 flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={safeMode}
+            onChange={() => setSafeMode(!safeMode)}
+            id="safe-mode"
+            className="accent-blue-600"
+          />
+          <label htmlFor="safe-mode" className="text-sm text-gray-700 dark:text-gray-300">
+            Enable Safe Mode (hide emotion analysis)
+          </label>
+        </div>
+
         {/* Reflection Message */}
-        {reflectionMessage && (
+        {!safeMode && reflectionMessage && (
           <div className="bg-yellow-50 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 p-4 rounded-xl shadow">
             <h2 className="text-lg font-semibold mb-2">📝 Reflection</h2>
             <p>{reflectionMessage}</p>
+          </div>
+        )}
+
+        {generateWeeklyEncouragement() && (
+          <div className="bg-green-50 dark:bg-green-900 text-green-800 dark:text-green-200 p-4 rounded-xl shadow mt-4">
+            <h2 className="text-lg font-semibold mb-1">💚 Progress</h2>
+            <p>{generateWeeklyEncouragement()}</p>
           </div>
         )}
       </div>
