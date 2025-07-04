@@ -11,7 +11,8 @@ import {
   HeartHandshake,
   Hash,
   LogOut,
-  HeartPulse, // ✅ Added for Google Fit
+  HeartPulse,
+  BookText, // ✅ Added for Library
   NotebookText,
 } from 'lucide-react';
 
@@ -22,21 +23,21 @@ const menuItems = [
   { icon: <Logs size={18} />, label: 'Chat Logs', path: '/logs' },
   { icon: <HeartHandshake size={18} />, label: 'Book a Session', path: '/book' },
   { icon: <Hash size={18} />, label: 'Twitter Analyzer', path: '/twitter' },
-  { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' }, // ✅ Correct icon + path
+  { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' },,
+  { icon: <BookText size={18} />, label: 'Library', path: '/library' } // ✅ Added Library here
   { icon: <NotebookText size={18} />, label: 'Journal', path: '/journal' }
 ];
 
-
-
 export default function Sidebar({ isCollapsed, setIsCollapsed }) {
   const [darkMode, setDarkMode] = useState(() => {
-  return localStorage.getItem('theme') === 'dark';
-});
+    return localStorage.getItem('theme') === 'dark';
+  });
 
   useEffect(() => {
-  document.documentElement.classList.toggle('dark', darkMode);
-  localStorage.setItem('theme', darkMode ? 'dark' : 'light');
-}, [darkMode]);
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
   const [activeItem, setActiveItem] = useState('Posts');
 
   return (
@@ -70,7 +71,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-semibold'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
-
               >
                 <Link to={path} className="flex items-center gap-3 w-full">
                   {icon}
