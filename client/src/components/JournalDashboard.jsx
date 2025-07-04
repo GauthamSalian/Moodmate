@@ -24,6 +24,7 @@ const JournalDashboard = () => {
   const [entryId, setEntryId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
+  const [reflectionMessage, setReflectionMessage] = useState("");
 
   const prompt = "How was your day? What emotions stood out?";
 
@@ -62,6 +63,7 @@ const JournalDashboard = () => {
 
     const data = await response.json();
     setSavedEntry(data);
+    setReflectionMessage(generateReflection(data.dominant_emotion));
     setWordEmotions(data.word_emotions);
     setEntry("");
     setCharCount(0);
@@ -116,6 +118,28 @@ const JournalDashboard = () => {
     });
   };
 
+  const generateReflection = (dominantEmotion) => {
+    switch (dominantEmotion) {
+      case "joy":
+        return "It's wonderful to see you're feeling joyful! Keep cherishing those positive moments.";
+      case "sadness":
+        return "It's okay to feel sad sometimes. Reflecting helps in healing.";
+      case "anger":
+        return "Anger can be powerful—remember to channel it constructively.";
+      case "fear":
+        return "Facing your fears is a brave step. Be kind to yourself.";
+      case "surprise":
+        return "Surprises can be exciting or overwhelming. Take a moment to process.";
+      case "calm":
+        return "Feeling calm is a sign of balance. Embrace the peace.";
+      case "neutral":
+        return "A neutral day offers rest and grounding. That’s valuable too.";
+      default:
+        return "Thanks for sharing your thoughts today.";
+    }
+  };
+
+
   const fetchEntryByDate = async (date) => {
     const formattedDate = date.toISOString().split("T")[0];
     console.log("Fetching for date:", formattedDate);
@@ -140,7 +164,7 @@ const JournalDashboard = () => {
       setIsViewing(true);
       setEntry(data.text); // Pre-fill text area for editing
       setCharCount(data.text.length);
-    } catch (err) {
+      setReflectionMessage(generateReflection(data.dominant_emotion));    } catch (err) {
       console.error("Error fetching entry:", err);
     }
   };
@@ -259,14 +283,26 @@ const JournalDashboard = () => {
       </div>
 
       {/* Emotion Calendar */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow self-start">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-          Emotion Calendar
-        </h2>
-        <Calendar
-          tileContent={tileContent}
-          onClickDay={fetchEntryByDate}
-        />
+      {/* Right Column: Calendar + Reflection */}
+      <div className="flex flex-col space-y-4">
+        {/* Emotion Calendar */}
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+            Emotion Calendar
+          </h2>
+          <Calendar
+            tileContent={tileContent}
+            onClickDay={fetchEntryByDate}
+          />
+        </div>
+
+        {/* Reflection Message */}
+        {reflectionMessage && (
+          <div className="bg-yellow-50 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 p-4 rounded-xl shadow">
+            <h2 className="text-lg font-semibold mb-2">📝 Reflection</h2>
+            <p>{reflectionMessage}</p>
+          </div>
+        )}
       </div>
     </div>
   );
