@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Date, Float, ForeignKey
 from sqlalchemy.orm import relationship
-from Moodmate.backend.database import Base
+from .database import Base
 
 class JournalEntry(Base):
     __tablename__ = "journals"
