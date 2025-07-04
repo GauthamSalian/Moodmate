@@ -9,6 +9,8 @@ import TwitterAnalyzer from './components/TwitterAnalyzer';
 import ChatInterface from './components/ChatInterface';
 import BookingPage from './pages/BookingPage';
 import GoogleFitAuth from './components/GoogleFitAuth'; // ✅ Correct path
+import JournalDashboard from './components/JournalDashboard'; 
+import './App.css';
 
 function App() {
   const [fusionInputs, setFusionInputs] = useState({
@@ -19,6 +21,11 @@ function App() {
   });
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  React.useEffect(() => {
+    console.log("🌙 Applying dark mode");
+    document.documentElement.classList.add("dark");
+  }, []);
 
   const handleVoiceInput = (stress) => {
     console.log("🎤 Voice Stress →", stress);
@@ -40,6 +47,7 @@ function App() {
             <Route path="/book" element={<BookingPage />} />
             <Route path="/" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
             <Route path="/sleep" element={<GoogleFitAuth onDataFetched={(data) => setFusionInputs(prev => ({ ...prev, ...data }))} />} />
+            <Route path="/journal" element={<JournalDashboard />} />
           </Routes>
         </div>
       </div>
