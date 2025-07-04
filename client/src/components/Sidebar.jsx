@@ -13,6 +13,7 @@ import {
   LogOut,
   HeartPulse,
   BookText, // ✅ Added for Library
+  NotebookText,
 } from 'lucide-react';
 
 const menuItems = [
@@ -22,8 +23,9 @@ const menuItems = [
   { icon: <Logs size={18} />, label: 'Chat Logs', path: '/logs' },
   { icon: <HeartHandshake size={18} />, label: 'Book a Session', path: '/book' },
   { icon: <Hash size={18} />, label: 'Twitter Analyzer', path: '/twitter' },
-  { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' },
-  { icon: <BookText size={18} />, label: 'Library', path: '/library' } // ✅ Added Library here
+  { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' },,
+  { icon: <BookText size={18} />, label: 'Library', path: '/library' }, // ✅ Added Library here
+  { icon: <NotebookText size={18} />, label: 'Journal', path: '/journal' }
 ];
 
 export default function Sidebar({ isCollapsed, setIsCollapsed }) {

@@ -6,3 +6,29 @@ body {
 .dark body {
   background: #111827; /* or Tailwind's gray-900 */
 }
+
+/* Dark mode styles for react-calendar */
+.dark .react-calendar {
+  background-color: #1f2937; /* Tailwind gray-800 */
+  color: #f9fafb; /* Tailwind gray-50 */
+  border: none;
+}
+
+.dark .react-calendar__tile {
+  background: transparent;
+  color: #d1d5db; /* Tailwind gray-300 */
+}
+
+.dark .react-calendar__tile--now {
+  background: #374151; /* Tailwind gray-700 */
+  color: #facc15; /* Tailwind yellow-400 */
+}
+
+.dark .react-calendar__tile--active {
+  background: #2563eb; /* Tailwind blue-600 */
+  color: white;
+}
+
+.dark .react-calendar__navigation button {
+  color: #f9fafb;
+}
