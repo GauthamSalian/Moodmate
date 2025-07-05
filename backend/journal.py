@@ -2,17 +2,26 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
-from transformers import pipeline
 from uuid import uuid4
 from datetime import date
-from sqlalchemy.orm import Session, relationship
+from sqlalchemy.orm import Session
 from .database import Base, SessionLocal, engine
 from . import models
+import requests
+import os
+from dotenv import load_dotenv
+load_dotenv()
+HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+if HF_API_TOKEN is None:
+    raise RuntimeError("HF_API_TOKEN not found. Check your .env file.")
 
+HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base"
+HEADERS = {
+    "Authorization": f"Bearer {HF_API_TOKEN}",
+}
 
-
+# Initialize DB and app
 models.Base.metadata.create_all(bind=engine)
-
 app = FastAPI()
 
 app.add_middleware(
@@ -23,8 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-emotion_pipeline = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", top_k=None)
-
+# Pydantic models
 class AllEmotionScore(BaseModel):
     emotion: str
     score: float
@@ -49,7 +57,6 @@ class JournalEntryResponse(BaseModel):
     class Config:
         orm_mode = True
 
-
 class JournalRequest(BaseModel):
     text: str
     date: date
@@ -57,7 +64,7 @@ class JournalRequest(BaseModel):
 class JournalEditRequest(BaseModel):
     text: str
 
-
+# Database dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -65,8 +72,21 @@ def get_db():
     finally:
         db.close()
 
+# Emotion analysis via Hugging Face API
+def call_emotion_api(text: str):
+    try:
+        response = requests.post(
+            HUGGINGFACE_API_URL,
+            headers=HEADERS,
+            json={"inputs": text}
+        )
+        response.raise_for_status()
+        return response.json()[0]
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Emotion API call failed: {str(e)}")
+
 def analyze_emotions(text: str):
-    full_text_results = emotion_pipeline(text)[0]
+    full_text_results = call_emotion_api(text)
     dominant_emotion = full_text_results[0]['label'].lower()
     dominant_score = round(full_text_results[0]['score'], 3)
     all_emotions = [
@@ -77,7 +97,8 @@ def analyze_emotions(text: str):
     words = text.split()
     word_emotions = []
     for word in words:
-        result = emotion_pipeline(word)[0][0]
+        word_result = call_emotion_api(word)
+        result = word_result[0]
         word_emotions.append({
             "text": word,
             "emotion": result['label'].lower(),
@@ -86,6 +107,7 @@ def analyze_emotions(text: str):
 
     return dominant_emotion, dominant_score, all_emotions, word_emotions
 
+# Routes
 @app.post("/journal-entry", response_model=JournalEntryResponse)
 def create_journal_entry(entry: JournalRequest, db: Session = Depends(get_db)):
     existing = db.query(models.JournalEntry).filter(models.JournalEntry.date == entry.date).first()
@@ -136,6 +158,9 @@ def update_journal_entry(entry_id: str, request: JournalEditRequest, db: Session
     dominant_emotion, dominant_score, all_emotions, word_emotions_data = analyze_emotions(request.text)
     journal.text = request.text
     journal.dominant_emotion = dominant_emotion
+    journal.dominant_score = dominant_score
+    journal.all_emotions = all_emotions
+    journal.word_emotions = []
 
     for word in word_emotions_data:
         journal.word_emotions.append(models.WordEmotion(
@@ -188,7 +213,7 @@ def get_all_journals(db: Session = Depends(get_db)):
             date=j.date,
             dominant_emotion=j.dominant_emotion,
             dominant_score=j.dominant_score or 0.0,
-            all_emotions=j.all_emotions or [],  # or fill this in if you want
+            all_emotions=j.all_emotions or [],
             word_emotions=[
                 WordEmotionOut(
                     text=w.text,
@@ -200,4 +225,3 @@ def get_all_journals(db: Session = Depends(get_db)):
         )
         response.append(entry)
     return response
-
