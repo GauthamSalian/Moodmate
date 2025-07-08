@@ -14,6 +14,7 @@ import {
   HeartPulse,
   BookText, // ✅ Added for Library
   NotebookText,
+  Repeat,
 } from 'lucide-react';
 
 const menuItems = [
@@ -24,6 +25,7 @@ const menuItems = [
   { icon: <HeartHandshake size={18} />, label: 'Book a Session', path: '/book' },
   { icon: <Hash size={18} />, label: 'Twitter Analyzer', path: '/twitter' },
   { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' },,
+  { icon: <Repeat size={18} />, label: 'Habit Flow', path: '/habits' },
   { icon: <BookText size={18} />, label: 'Library', path: '/library' }, // ✅ Added Library here
   { icon: <NotebookText size={18} />, label: 'Journal', path: '/journal' }
 ];
@@ -61,19 +63,26 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
             </button>
           </div>
 
+          
           <ul className="space-y-2">
             {menuItems.map(({ icon, label, badge, path }) => (
               <li
                 key={label}
                 onClick={() => setActiveItem(label)}
-                className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${
+                title={isCollapsed ? label : ''}
+                className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-200 ${
                   activeItem === label
                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-semibold'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
-                <Link to={path} className="flex items-center gap-3 w-full">
-                  {icon}
+                <Link
+                  to={path}
+                  className={`flex items-center w-full transition-all duration-200 ${
+                    isCollapsed ? 'justify-center' : 'gap-3'
+                  }`}
+                >
+                  <div className="w-6 h-6 flex items-center justify-center">{icon}</div>
                   {!isCollapsed && <span>{label}</span>}
                   {!isCollapsed && badge && (
                     <span className="text-xs bg-blue-100 text-blue-600 font-semibold px-2 py-0.5 rounded">
