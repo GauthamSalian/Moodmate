@@ -14,6 +14,7 @@ import {
   HeartPulse,
   BookText, // ✅ Added for Library
   NotebookText,
+  Repeat,
 } from 'lucide-react';
 
 const menuItems = [
@@ -24,6 +25,7 @@ const menuItems = [
   { icon: <HeartHandshake size={18} />, label: 'Book a Session', path: '/book' },
   { icon: <Hash size={18} />, label: 'Twitter Analyzer', path: '/twitter' },
   { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' },,
+  { icon: <Repeat size={18} />, label: 'Habit Flow', path: '/habits' },
   { icon: <BookText size={18} />, label: 'Library', path: '/library' }, // ✅ Added Library here
   { icon: <NotebookText size={18} />, label: 'Journal', path: '/journal' }
 ];

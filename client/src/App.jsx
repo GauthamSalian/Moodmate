@@ -11,6 +11,7 @@ import BookingPage from './pages/BookingPage';
 import GoogleFitAuth from './components/GoogleFitAuth'; // ✅ Correct path
 import BreathingCatalog from './components/BreathingCatalog';
 import JournalDashboard from './components/JournalDashboard'; 
+import HabitFlow from './components/HabitFlow'; // ✅ Correct path
 import './App.css';
 
 function App() {
@@ -50,6 +51,7 @@ function App() {
             <Route path="/sleep" element={<GoogleFitAuth onDataFetched={(data) => setFusionInputs(prev => ({ ...prev, ...data }))} />} />
             <Route path="/library" element={<BreathingCatalog />} />
             <Route path="/journal" element={<JournalDashboard />} />
+            <Route path="/habits" element={<HabitFlow />} />
           </Routes>
         </div>
       </div>
