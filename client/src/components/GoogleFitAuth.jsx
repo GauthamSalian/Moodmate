@@ -7,14 +7,37 @@ const SCOPES = [
 ].join(" ");
 
 function GoogleFitAuth({ onDataFetched }) {
-  const [status, setStatus] = useState("loading");
+  const [status, setStatus] = useState("idle");
   const [sleep, setSleep] = useState(null);
   const [hrv, setHrv] = useState(null);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualSleep, setManualSleep] = useState('');
+  const [manualHRV, setManualHRV] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem("manualFitHistory") || "{}");
+    const formatted = Object.entries(stored).map(([date, entry]) => ({ date, ...entry }));
+    setHistory(formatted);
+  }, []);
+
+  const saveToHistory = (date, sleep, hrv) => {
+    const current = JSON.parse(localStorage.getItem("manualFitHistory") || "{}");
+    current[date] = { sleep, hrv };
+    localStorage.setItem("manualFitHistory", JSON.stringify(current));
+    setHistory(Object.entries(current).map(([date, entry]) => ({ date, ...entry })));
+  };
 
   const fetchGoogleFitData = async (accessToken) => {
     setStatus("loading");
-    const now = Date.now();
-    const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
+
+    const start = new Date(selectedDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    const startTimeMillis = start.getTime();
+    const endTimeMillis = end.getTime();
 
     try {
       const res = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", {
@@ -29,8 +52,8 @@ function GoogleFitAuth({ onDataFetched }) {
             { dataTypeName: "com.google.heart_rate.bpm" }
           ],
           bucketByTime: { durationMillis: 86400000 },
-          startTimeMillis: threeDaysAgo,
-          endTimeMillis: now
+          startTimeMillis,
+          endTimeMillis
         })
       });
 
@@ -67,6 +90,7 @@ function GoogleFitAuth({ onDataFetched }) {
       setHrv(avgHRV);
       setStatus("success");
 
+      saveToHistory(selectedDate, totalSleepHrs, avgHRV);
       if (onDataFetched) {
         onDataFetched({ sleep: totalSleepHrs, hrv: avgHRV });
       }
@@ -76,7 +100,7 @@ function GoogleFitAuth({ onDataFetched }) {
     }
   };
 
-  useEffect(() => {
+  const handleFetchFromGoogle = () => {
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
@@ -96,32 +120,59 @@ function GoogleFitAuth({ onDataFetched }) {
       tokenClient.requestAccessToken();
     };
     document.body.appendChild(script);
-  }, []);
+  };
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    const sleepVal = parseFloat(manualSleep);
+    const hrvVal = parseFloat(manualHRV);
+
+    if (!isNaN(sleepVal) && !isNaN(hrvVal)) {
+      setSleep(sleepVal);
+      setHrv(hrvVal);
+      setStatus("success");
+      saveToHistory(selectedDate, sleepVal, hrvVal);
+      if (onDataFetched) {
+        onDataFetched({ sleep: sleepVal, hrv: hrvVal });
+      }
+    } else {
+      setStatus("error");
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl shadow-lg p-8 flex flex-col items-center relative overflow-hidden transition-colors duration-300">
-        <div className="mb-6">
-          <svg className={`animate-spin-slow ${status === "success" ? "text-green-400" : "text-blue-500"}`} width="64" height="64" viewBox="0 0 64 64" fill="none">
-            <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="8" opacity="0.2" />
-            <path d="M32 4a28 28 0 1 1-19.8 47.8" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
-          </svg>
-        </div>
+      <div className="w-full max-w-xl bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl shadow-lg p-8 flex flex-col items-center relative overflow-hidden transition-colors duration-300">
         <h2 className="text-2xl font-bold mb-2 text-blue-700">Google Fit Authorization</h2>
-        <p className="text-gray-600 mb-6 text-center">
-          Connecting to your Google Fit account to fetch your recent sleep and heart rate data.
+        <p className="text-gray-600 mb-4 text-center">
+          Select a date and fetch your sleep + HRV data.
         </p>
-        {status === "loading" && (
-          <div className="flex flex-col items-center">
-            <div className="loader mb-2"></div>
-            <span className="text-blue-500 font-medium animate-pulse">Authorizing and fetching data...</span>
-          </div>
+
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="mb-4 px-3 py-2 rounded border w-full"
+        />
+
+        {!manualMode && (
+          <button
+            onClick={handleFetchFromGoogle}
+            className="mb-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Fetch from Google Fit
+          </button>
         )}
+
+        {status === "loading" && (
+          <div className="text-blue-500 font-medium animate-pulse mb-4">Authorizing and fetching data...</div>
+        )}
+
         {status === "success" && (
-          <div className="w-full text-center animate-fade-in">
-            <div className="mb-4">
-              <span className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold mb-2">
-                ✅ Data fetched successfully!
+          <div className="w-full text-center animate-fade-in mb-4">
+            <div className="mb-2">
+              <span className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">
+                ✅ Data for {selectedDate} saved!
               </span>
             </div>
             <div className="flex justify-center gap-8 mb-2">
@@ -136,37 +187,90 @@ function GoogleFitAuth({ onDataFetched }) {
             </div>
           </div>
         )}
+
         {status === "error" && (
-          <div className="w-full text-center animate-fade-in">
-            <span className="inline-block bg-red-100 text-red-700 px-3 py-1 rounded-full font-semibold mb-2">
-              ❌ Failed to fetch data. Please try again.
+          <div className="w-full text-center animate-fade-in mb-4">
+            <span className="inline-block bg-red-100 text-red-700 px-3 py-1 rounded-full font-semibold">
+              ❌ Failed to fetch data. Please try again or use manual input.
             </span>
           </div>
         )}
+
+        {!manualMode ? (
+          <button
+            onClick={() => setManualMode(true)}
+            className="text-sm text-blue-600 hover:underline mt-2"
+          >
+            Don’t have a wearable? Enter data manually
+          </button>
+        ) : (
+          <form onSubmit={handleManualSubmit} className="w-full mt-4">
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Sleep Duration (hrs)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={manualSleep}
+                onChange={(e) => setManualSleep(e.target.value)}
+                className="w-full border px-3 py-2 rounded"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Average HRV</label>
+              <input
+                type="number"
+                step="0.1"
+                value={manualHRV}
+                onChange={(e) => setManualHRV(e.target.value)}
+                className="w-full border px-3 py-2 rounded"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full"
+            >
+              Submit Data
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setManualMode(false);
+                setManualSleep("");
+                setManualHRV("");
+              }}
+              className="text-sm text-gray-500 hover:underline mt-2 block w-full text-center"
+            >
+              Use Google Fit instead
+            </button>
+          </form>
+        )}
+
+        <div className="mt-6 w-full">
+          <h3 className="text-lg font-semibold mb-2">📅 Historical Entries</h3>
+          <div className="overflow-auto max-h-48 border rounded p-2">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left pb-1">Date</th>
+                  <th className="text-left pb-1">Sleep (hrs)</th>
+                  <th className="text-left pb-1">HRV</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((entry) => (
+                  <tr key={entry.date}>
+                    <td className="py-1 pr-4">{entry.date}</td>
+                    <td className="py-1 pr-4">{entry.sleep.toFixed(2)}</td>
+                    <td className="py-1">{entry.hrv.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <style>{`
-        .animate-spin-slow {
-          animation: spin 2s linear infinite;
-        }
-        @keyframes spin {
-          100% { transform: rotate(360deg); }
-        }
-        .loader {
-          border: 4px solid #e0e7ef;
-          border-top: 4px solid #3b82f6;
-          border-radius: 50%;
-          width: 32px;
-          height: 32px;
-          animation: spin 1s linear infinite;
-        }
-        .animate-fade-in {
-          animation: fadeIn 0.7s;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px);}
-          to { opacity: 1; transform: translateY(0);}
-        }
-      `}</style>
     </div>
   );
 }
