@@ -14,6 +14,8 @@ function ChatInterface() {
   const [selectedVoice, setSelectedVoice] = useState(null);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
+  const [showHelpPopup, setShowHelpPopup] = useState(false);
+  
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,6 +40,33 @@ function ChatInterface() {
       loadVoices();
     }
   }, [selectedVoice]);
+
+  const HelpPopup = () => {
+  const [showHelpPopup, setShowHelpPopup] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowHelpPopup(true);
+    }, 1000); // 1 second delay
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!showHelpPopup) return null;
+      return (
+        <div className="fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg border border-gray-200 z-50 animate-fade-in">
+          <p className="text-sm text-gray-700">
+            Need help? I'm here if you're feeling overwhelmed. 💬
+          </p>
+          <button
+            onClick={() => setShowHelpPopup(false)}
+            className="mt-2 text-xs text-blue-500 hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      );
+    };
 
   const speak = (text) => {
     if (!text || !selectedVoice) return;
@@ -80,7 +109,7 @@ function ChatInterface() {
         utterance.voice = selectedVoice;
         utterance.pitch = 1.1;
         utterance.rate = 0.95;
-        utterance.volume = 1.0;
+        utterance.volume = 1.0; 
         speechSynthesis.cancel();
         setIsBotSpeaking(true);
         utterance.onend = () => setIsBotSpeaking(false);
@@ -119,6 +148,25 @@ try {
 
       const remaining = botText.slice(spokenSoFar.length).trim();
       if (remaining.length > 2) speakBuffered(remaining);
+      const stressKeywords = [
+        "i can't",
+        "give up",
+        "worthless",
+        "want to disappear",
+        "i'm broken",
+        "no one cares",
+        "everything is dark",
+        "i hate myself",
+        "ending it all"
+      ];
+      const isHighlyStressed = stressKeywords.some((kw) =>
+        textToSend.toLowerCase().includes(kw)
+      );
+      if (isHighlyStressed) {
+        console.log("⚠️ Stress detected — triggering help popup.");
+        setTimeout(() => setShowHelpPopup(true), 500);
+      }
+
     } catch {
       const errorMsg = "Error: Could not reach server.";
       setMessages((prev) => [...prev, { sender: "bot", text: errorMsg }]);
@@ -296,6 +344,32 @@ try {
           {loading ? "..." : "Send"}
         </button>
       </form>
+
+      {showHelpPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-sm w-full text-center space-y-4">
+            <h2 className="text-lg font-semibold text-red-600">It’s okay to ask for help 🌱</h2>
+            <p className="text-gray-800 dark:text-gray-200">
+              It seems like you're feeling overwhelmed. You're not alone—talking to someone can really help.
+            </p>
+            <button
+              onClick={() => {
+                setShowHelpPopup(false);
+                window.location.href = "/book";
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+            >
+              Talk to a Professional
+            </button>
+            <button
+              onClick={() => setShowHelpPopup(false)}
+              className="text-sm text-gray-500 underline"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

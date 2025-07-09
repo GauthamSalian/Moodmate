@@ -3,27 +3,32 @@ import React from 'react';
 import PsychologistCard from '../components/PsychologistCard';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Psychologist1 from '../assets/Psychologist1.jpeg';
+import Psychologist2 from '../assets/Psychologist2.jpeg';
+import Psychologist3 from '../assets/Psychologist3.jpeg';
+
 
 const psychologists = [
   {
     name: "Dr. Maya Kapoor",
     specialty: "Clinical Psychologist",
-    image: "/psychologists/maya.jpg",
+    image: Psychologist3,
     slots: ["10:00 AM", "2:30 PM", "6:00 PM"]
   },
   {
     name: "Dr. Arjun Mehta",
     specialty: "Stress & Trauma Expert",
-    image: "/psychologists/arjun.jpg",
+    image: Psychologist2,
     slots: ["9:00 AM", "1:00 PM", "4:00 PM"]
   },
   {
     name: "Dr. Priya Sharma",
     specialty: "Adolescent Counselor",
-    image: "/psychologists/priya.jpg",
+    image: Psychologist1,
     slots: ["11:00 AM", "3:00 PM", "5:30 PM"]
   }
 ];
+
 
 const BookingPage = (props) => {
   const handleBooking = (name, slot) => {
@@ -46,3 +51,4 @@ const BookingPage = (props) => {
 }
 
 export default BookingPage;
+
