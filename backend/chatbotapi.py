@@ -1,86 +1,59 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware  # <-- add this import
 from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
-import httpx
-import os
-import faiss
-import numpy as np
-from sentence_transformers import SentenceTransformer
-import json
-
+import httpx, os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 app = FastAPI()
 
-# CORS (Allow React frontend)
+# Add CORS middleware here
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with frontend URL in prod
+    allow_origins=["http://localhost:5173"],  # or ["*"] for dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load LLM key
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# ==== Models ====
-class SuggestRequest(BaseModel):
-    badHabit: str
 
-class QuoteRequest(BaseModel):
-    topic: str
+BASE_PROMPT = """
+You are Lumi, a compassionate mental health support assistant. You help users who are feeling stressed, anxious, or overwhelmed.
+You are not a medical professional and never offer clinical advice or diagnosis.
+Always encourage users to reach out to licensed therapists or mental health hotlines if they are in crisis.
+Keep your responses warm, empathetic, and supportive.
+"""
 
-# ==== Granite LLM for Habit Suggestion ====
-@app.post("/api/suggest")
-async def suggest_habit(data: SuggestRequest):
-    prompt = f"""Suggest 3 practical, positive replacement habits for the following bad habit:
-Bad Habit: "{data.badHabit}"
-List them as short bullet points."""
+class Message(BaseModel):
+    user_input: str
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
+@app.post("/chat")
+async def chat(message: Message, request: Request):
+    print(await request.json())  # Log raw incoming JSON
+    async with httpx.AsyncClient() as client:
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json",
+        }
 
-    payload = {
-        "model": "openrouter/ibm/granite-13b-chat",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ]
-    }
+        data = {
+            "model": "mistralai/mistral-small-3.2-24b-instruct:free",
+            "messages": [
+                {"role": "system", "content": BASE_PROMPT.strip()},
+                {"role": "user", "content": message.user_input},
+            ],
+            "temperature": 0.7
+        }
 
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers)
-            reply = res.json()["choices"][0]["message"]["content"]
-            suggestions = [s.strip("-•* ") for s in reply.splitlines() if s.strip()]
-            return {"suggestions": suggestions}
-    except Exception as e:
-        print("LLM Error:", e)
-        return {"suggestions": ["Try a healthier alternative."]}
+        response = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=data
+        )
 
-# ==== RAG Quote Retrieval ====
-
-# Load quotes
-with open("quotes.json", "r", encoding="utf-8") as f:
-    quotes = json.load(f)
-
-texts = [q["quote"] for q in quotes]
-model = SentenceTransformer("all-MiniLM-L6-v2")
-embeddings = model.encode(texts)
-dimension = embeddings.shape[1]
-index = faiss.IndexFlatL2(dimension)
-index.add(np.array(embeddings))
-
-@app.post("/api/rag/quote")
-def get_quote(data: QuoteRequest):
-    try:
-        query_vec = model.encode([data.topic])
-        D, I = index.search(np.array(query_vec), k=1)
-        best_quote = texts[I[0][0]]
-        return {"quote": best_quote}
-    except Exception as e:
-        print("Quote RAG Error:", e)
-        return {"quote": "Small habits lead to big change — Atomic Habits"}
+        result = response.json()
+        reply = result['choices'][0]['message']['content']
+        return {"response": reply}
