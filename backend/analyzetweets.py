@@ -3,7 +3,9 @@ import torch
 import re
 import json
 import requests
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from ibm_watsonx_ai.foundation_models import ModelInference
+from ibm_watsonx_ai.credentials import Credentials
+from ibm_watsonx_ai import APIClient
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from collections import defaultdict, Counter
@@ -12,24 +14,23 @@ load_dotenv()
 BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
 print("BEARER_TOKEN:", "Loaded" if BEARER_TOKEN else "Missing or Empty")
 
-emotion_analyzer = pipeline(
-    "text-classification",
-    model="j-hartmann/emotion-english-distilroberta-base",
-    #top_k=1
-)
 
-model_path_name = "ibm-granite/granite-guardian-3.2-3b-a800m"
+
 safe_token = "No"
 risky_token = "Yes"
 
-tokenizer = AutoTokenizer.from_pretrained(model_path_name)
-model = AutoModelForCausalLM.from_pretrained(
-    model_path_name,
-    torch_dtype=torch.float16,
-    device_map="auto",
-    max_memory={0: "5GB"}
+credentials = Credentials(
+    url="https://eu-de.ml.cloud.ibm.com",  # or regional Watsonx URL
+    api_key=os.getenv("WATSONX_API_KEY")
 )
-model.eval()
+client = APIClient(credentials)
+
+guardian_model = ModelInference(
+    model_id="ibm/granite-3-3-8b-instruct",  # ⚠️ A supported model with long-term viability
+    credentials=credentials,
+    project_id="1cb8c38f-d650-41fe-9836-86659006c090",
+    params={"decoding_method": "greedy", "max_new_tokens": 100}
+)
 
 app = FastAPI()
 app.add_middleware(
@@ -65,73 +66,54 @@ def get_user_tweets(user_id, max_results=5):
         return []
 
 def analyze_tweet(text):
-    messages = [{"role": "user", "content": text}]
-    guardian_config = {"risk_name": "harm"}
-    inputs = tokenizer.apply_chat_template(
-        messages,
-        guardian_config=guardian_config,
-        add_generation_prompt=True,
-        return_tensors="pt",
-        return_dict=True
-    )
-    input_ids = inputs["input_ids"]
+    try:
+        prompt = f"""
+            <risk_evaluation>
+            <text>{text}</text>
 
-    with torch.no_grad():
-        outputs = model(input_ids=input_ids)
-        next_token_logits = outputs.logits[0, -1, :]
+            Analyze this text for emotional or psychological risk. Respond using structured XML format:
 
-    yes_token_id = tokenizer.encode(risky_token, add_special_tokens=False)[0]
-    no_token_id = tokenizer.encode(safe_token, add_special_tokens=False)[0]
-    probs = torch.softmax(next_token_logits[[no_token_id, yes_token_id]], dim=0)
-    prob_safe = probs[0].item()
-    prob_risk = probs[1].item()
+            <harm>[Yes or No]</harm>
+            <confidence>[Numeric probability between 0.0 (no risk) and 1.0 (high risk)]</confidence>
+            <comment>[Brief reason why the risk was assessed]</comment>
 
-    with torch.no_grad():
-        gen_output = model.generate(
-            input_ids=input_ids,
-            do_sample=False,
-            max_new_tokens=20,
-            return_dict_in_generate=True,
-            output_scores=True,
-        )
-    output_text = tokenizer.decode(gen_output.sequences[0][input_ids.shape[1]:], skip_special_tokens=True)
-    confidence_match = re.search(r'<confidence>(.*?)</confidence>', output_text)
-    confidence_str = confidence_match.group(1).strip() if confidence_match else "Unknown"
-    label = "Yes" if prob_risk > prob_safe else "No"
-    return {
-        "risk_detected": label,
-        "confidence": confidence_str,
-        "probability_of_risk": prob_risk
-    }
+            Your confidence score should directly reflect the probability of risk based on language, tone, and context.
+            </risk_evaluation>
+            """
 
-def extract_emotion_words(tweets):
-    emotion_counts = defaultdict(Counter)
-    for tweet in tweets:
-        text = tweet["text"]
+
+        response = guardian_model.generate(prompt)
+        result_text = response['results'][0]['generated_text']
+        print("Generated Text:", result_text)
+
+        label_match = re.search(r"<harm>(.*?)</harm>", result_text)
+        confidence_match = re.search(r"<confidence>(.*?)</confidence>", result_text)
+        explanation_match = re.search(r"<comment>(.*?)</comment>", result_text)
+
+        label = label_match.group(1).strip() if label_match else "Unknown"
+        confidence_str = confidence_match.group(1).strip() if confidence_match else "Unknown"
+        explanation = explanation_match.group(1).strip() if explanation_match else "Not provided"
+
         try:
-            result = emotion_analyzer(text)
-            if isinstance(result, list) and isinstance(result[0], list):
-                result = result[0]
-            emotion = result[0]["label"]
-            if emotion.lower() == "neutral":
-                continue
-        except Exception as e:
-            print(f"Emotion analysis failed for tweet: {text}\nError: {e}")
-            continue
+            probability_of_risk = float(confidence_str)
+        except ValueError:
+            probability_of_risk = 0.0
 
-        words = [
-            word.strip("#@,.!?").lower()
-            for word in text.split()
-            if len(word) > 2
-        ]
-        for word in words:
-            emotion_counts[emotion][word] += 1
+        return {
+            "text": text,
+            "risk_detected": label,
+            "confidence": confidence_str,
+            "probability_of_risk": probability_of_risk,
+            "explanation": explanation
+        }
 
-    return {
-        emotion: dict(counter.most_common(30))
-        for emotion, counter in emotion_counts.items()
-    }
-
+    except Exception as e:
+        return {
+            "text": text,
+            "risk_detected": "Unknown",
+            "confidence": "Unknown",
+            "probability_of_risk": 0.0,
+        }
 
 @app.get("/analyze_tweets/{username}")
 def analyze_tweets(username: str, max_results: int = 5):
@@ -153,16 +135,6 @@ def analyze_tweets(username: str, max_results: int = 5):
     except Exception as e:
         return {"error": str(e)}
     
-@app.get("/wordcloud_data/{username}")
-def generate_wordcloud_data(username: str, max_results: int = 10):
-    try:
-        user_id = get_user_id(username)
-        tweets = get_user_tweets(user_id, max_results=max_results)
-        tweet_data = [{"text": tweet["text"]} for tweet in tweets]
-        wordcloud_data = extract_emotion_words(tweet_data)
-        return {"wordcloud": wordcloud_data}
-    except Exception as e:
-        return {"error": str(e)}
 
 @app.get("/analyze_all/{username}")
 def analyze_all(username: str, max_results: int = 5):
@@ -181,11 +153,9 @@ def analyze_all(username: str, max_results: int = 5):
                 **result
             })
 
-        wordcloud_data = extract_emotion_words(tweet_data)
 
         return {
             "risk_analysis": results,
-            "wordcloud": wordcloud_data
         }
     except Exception as e:
         return {"error": str(e)}
