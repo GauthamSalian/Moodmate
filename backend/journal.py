@@ -10,7 +10,36 @@ from . import models
 import requests
 import os
 from dotenv import load_dotenv
+import boto3
+from decimal import Decimal
 load_dotenv()
+
+AWS_REGION = "ap-south-1"
+DYNAMO_TABLE = "UserMemory"
+FIXED_USER_ID = "demo_user"
+
+dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
+dynamo_table = dynamodb.Table(DYNAMO_TABLE)
+
+def convert_floats_to_decimal(obj):
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    elif isinstance(obj, list):
+        return [convert_floats_to_decimal(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_floats_to_decimal(v) for k, v in obj.items()}
+    else:
+        return obj
+
+def save_to_dynamodb(item: dict):
+    item["user_id"] = FIXED_USER_ID
+    item = convert_floats_to_decimal(item)
+    try:
+        dynamo_table.put_item(Item=item)
+    except Exception as e:
+        print(f"❌ DynamoDB Upload Error (id={item.get('id')}):", e)
+
+
 HF_API_TOKEN = os.getenv("HF_API_TOKEN")
 if HF_API_TOKEN is None:
     raise RuntimeError("HF_API_TOKEN not found. Check your .env file.")
@@ -137,6 +166,16 @@ def create_journal_entry(entry: JournalRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(journal)
 
+    save_to_dynamodb({
+        "id": journal.id,
+        "text": journal.text,
+        "date": journal.date.isoformat(),
+        "dominant_emotion": dominant_emotion,
+        "dominant_score": dominant_score,
+        "all_emotions": all_emotions,
+        "word_emotions": word_emotions_data
+    })
+
     return {
         "id": journal.id,
         "text": journal.text,
@@ -172,6 +211,16 @@ def update_journal_entry(entry_id: str, request: JournalEditRequest, db: Session
 
     db.commit()
     db.refresh(journal)
+
+    save_to_dynamodb({
+        "id": journal.id,
+        "text": journal.text,
+        "date": journal.date.isoformat(),
+        "dominant_emotion": dominant_emotion,
+        "dominant_score": dominant_score,
+        "all_emotions": all_emotions,
+        "word_emotions": word_emotions_data
+    })
 
     return {
         "id": journal.id,
