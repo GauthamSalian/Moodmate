@@ -1,29 +1,29 @@
-import requests
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import httpx, os
+import httpx, os, difflib
 from dotenv import load_dotenv
-from datetime import datetime
 import boto3
 from uuid import uuid4
+from datetime import datetime
+
 load_dotenv()
 app = FastAPI()
 
-# ✅ CORS
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # update for prod
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ DynamoDB setup
+# DynamoDB setup
 dynamodb = boto3.resource("dynamodb")
 goal_table = dynamodb.Table("UserGoals")
 
-# 🧠 Lumi Assistant Prompt
+# Base prompt
 BASE_PROMPT = """
 You are Lumi, a compassionate mental health support assistant. You help users who are feeling stressed, anxious, or overwhelmed.
 You are not a medical professional and never offer clinical advice or diagnosis.
@@ -31,69 +31,78 @@ Always encourage users to reach out to licensed therapists or mental health hotl
 Keep your responses warm, empathetic, and supportive. Keep the responses concise and to the point.
 """
 
-# 📨 Request schema
+# Request schema
 class Message(BaseModel):
     user_input: str
     user_id: str = "demo_user"
 
-# 🧩 Helper: Detect explicit goal creation request
-def is_goal_request(user_input: str) -> bool:
-    keywords = ["can you help me", "create a goal", "set a goal", "help me set", "want to start a goal"]
-    return any(kw in user_input.lower() for kw in keywords)
+# Affirmation detection
+def is_affirmation(text: str) -> bool:
+    affirmations = ["yes", "sure", "okay", "ok", "sounds good", "i did", "i completed it", "done"]
+    return bool(difflib.get_close_matches(text.lower(), affirmations, n=1, cutoff=0.8))
 
-# ✅ Create goal if it doesn't exist
-def create_goal_if_missing(user_id: str, goal_type: str) -> bool:
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    existing = goal_table.scan()
-    for item in existing.get("Items", []):
-        if item["user_id"] == user_id and item["goal_type"] == goal_type:
-            return False  # Already exists
-    goal = {
+# Goal helpers
+def get_active_goals(user_id: str):
+    response = goal_table.scan()
+    return [item for item in response.get("Items", []) if item.get("user_id") == user_id and item.get("status") == "active"]
+
+def complete_goal(user_id: str, goal_type: str):
+    response = goal_table.scan()
+    for item in response.get("Items", []):
+        if item["user_id"] == user_id and item["goal_type"] == goal_type and item["status"] == "active":
+            goal_table.update_item(
+                Key={"user_id": item["user_id"], "goal_id": item["goal_id"]},
+                UpdateExpression="SET #s = :val",
+                ExpressionAttributeNames={"#s": "status"},
+                ExpressionAttributeValues={":val": "completed"}
+            )
+            print(f"✅ Goal '{goal_type}' marked as completed.")
+            break
+
+def create_goal_if_missing(user_id: str, goal_type: str):
+    active = get_active_goals(user_id)
+    if any(g["goal_type"] == goal_type for g in active):
+        return False
+    goal_table.put_item(Item={
         "user_id": user_id,
         "goal_id": str(uuid4()),
         "goal_type": goal_type,
         "status": "active",
-        "progress": 0,
         "created_at": datetime.utcnow().isoformat(),
-        "last_triggered": None
-    }
-    goal_table.put_item(Item=goal)
-    print(f"🎯 Created goal: {goal_type} for {user_id}")
+        "reason": "User explicitly requested goal"
+    })
+    print(f"🎯 Created goal: {goal_type}")
     return True
 
-
-# ✅ Chat route
+# Main chat route
 @app.post("/chat")
 async def chat(message: Message, request: Request):
     user_input = message.user_input.strip()
-    user_id = message.user_id or "demo_user"
+    user_id = message.user_id
     print(f"🧠 User Input: {user_input}")
 
-    # ✅ Check for goal creation intent
-    if is_goal_request(user_input):
-        goal_name = "self-care goal"  # You can refine this later with NLP or ask for naming
-        created = create_goal_if_missing(user_id, goal_name)
+    # Step 1: Explicit goal creation
+    if "create a goal" in user_input.lower() or "help me" in user_input.lower():
+        created = create_goal_if_missing(user_id, "self-care goal")
         if created:
-            return {"response": f"🌱 I've created your goal: *{goal_name}*. Let’s keep growing together."}
+            return {"response": "🌱 I've created your goal: *self-care goal*. Let’s keep growing together."}
         else:
-            return {"response": f"🌿 You already have an active goal: *{goal_name}* today. Keep it up!"}
+            return {"response": "🌿 You already have an active goal: *self-care goal*. Let me know how it's going!"}
 
-    # ✅ Goal check-in reminder
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    goals = goal_table.scan().get("Items", [])
-    for goal in goals:
-        if goal["user_id"] == user_id and goal["created_date"] == today and goal["status"] == "active":
-            return {"response": f"💭 Just checking in — how’s *{goal['goal_name']}* going today?"}
+    # Step 2: Check for active goals and respond
+    active_goals = get_active_goals(user_id)
+    for goal in active_goals:
+        if goal["goal_type"] == "self-care goal":
+            if is_affirmation(user_input):
+                complete_goal(user_id, "self-care goal")
+                return {"response": "🌈 That’s wonderful to hear! I’ve marked your goal as completed. Keep taking care of yourself."}
+            return {"response": "💭 Just checking in — did you get a chance to work on your *self-care goal* today?"}
 
-    # ✅ Fallback to AWS RAG
+    # Step 3: Fallback to AWS RAG
     full_prompt = f"{BASE_PROMPT.strip()}\n\nUser: {user_input}"
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "http://13.203.198.145:8000/query",
-                json={"query": full_prompt},
-                timeout=10.0
-            )
+            response = await client.post("http://13.203.198.145:8000/query", json={"query": full_prompt}, timeout=60.0)
             if response.status_code != 200:
                 print("❌ AWS RAG Error:", response.text)
                 return {"response": "⚠️ AWS returned an error."}
