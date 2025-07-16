@@ -82,23 +82,40 @@ def get_goal_response(user_input: str, goal):
     goal_type = goal.get("goal_type")
     goal_id = goal.get("goal_id")
     user_id = goal.get("user_id")
+    user_input_lower = user_input.lower()
 
     if goal_type == "reduce_stress":
-        if user_input.lower() in ["yes", "sure", "okay", "ok", "let's do it"]:
-            complete_goal(user_id, goal_type)
-            return "Great! Let’s start a breathing exercise 🌬️", True
-        return "Hey, I noticed you’ve been feeling stressed. Want to try a breathing exercise?", True
+        if any(phrase in user_input_lower for phrase in ["calm", "relaxed", "less stressed", "not anxious", "better now"]):
+            result = increment_goal_progress(user_id, goal_id)
+            if result == "🎉 Goal completed!":
+                complete_goal(user_id, goal_type)
+            return f"Glad to hear you're feeling better! 🌈 {result}", True
+        return "Feeling stressed lately? Let’s try a short breathing exercise 🌬️", True
 
     elif goal_type == "improve_sleep":
-        if "sleep" in user_input.lower():
+        if any(phrase in user_input_lower for phrase in ["slept well", "good sleep", "went to bed early", "consistent sleep", "slept early", "deep sleep"]):
             result = increment_goal_progress(user_id, goal_id)
+            if result == "🎉 Goal completed!":
+                complete_goal(user_id, goal_type)
             return f"Tracking your sleep! 💤 {result}", True
-        return "Sleep is crucial for your mental well-being. Did you sleep well recently?", True
+        return "Sleep is crucial for your well-being. Did you sleep well recently?", True
 
     elif goal_type == "boost_social":
-        if any(word in user_input.lower() for word in ["friend", "call", "meet", "social"]):
+        if any(word in user_input_lower for word in ["talked", "call", "met", "friend", "hangout", "socialized", "messaged"]):
             result = increment_goal_progress(user_id, goal_id)
-            return f"That's awesome! Social moments matter 💬 {result}", True
-        return "Connecting with others helps a lot. Have you had any recent social time?", True
+            if result == "🎉 Goal completed!":
+                complete_goal(user_id, goal_type)
+            return f"That's awesome! Social connections matter 💬 {result}", True
+        return "Have you had any meaningful conversations or social time lately?", True
+
+    elif goal_type == "improve_focus":
+        if any(word in user_input_lower for word in ["focused", "concentrated", "productive", "avoided distractions"]):
+            result = increment_goal_progress(user_id, goal_id)
+            if result == "🎉 Goal completed!":
+                complete_goal(user_id, goal_type)
+            return f"Nice work! Staying focused really pays off. 🔍 {result}", True
+        return "How has your focus been lately? Managed to stay on task?", True
 
     return None, False
+
+

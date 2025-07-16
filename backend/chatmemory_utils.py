@@ -16,8 +16,8 @@ def fetch_recent_chat(user_id: str, limit: int = 6) -> str:
 
     chat_history = ""
     for item in items:
-        role = item["role"].capitalize()
-        msg = item["message"].strip()
+        role = item.get("message_role", "user").capitalize()
+        msg = item.get("content", "").strip()
         chat_history += f"{role}: {msg}\n"
 
     return chat_history.strip()
