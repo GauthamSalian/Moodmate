@@ -59,7 +59,7 @@ def complete_goal(user_id: str, goal_type: str):
             print(f"✅ Goal '{goal_type}' marked as completed.")
             break
 
-def create_goal_if_missing(user_id: str, goal_type: str):
+def create_goal_if_missing(user_id: str, goal_type: str, reason: str = "User explicitly requested goal"):
     active = get_active_goals(user_id)
     if any(g["goal_type"] == goal_type for g in active):
         return False
@@ -69,10 +69,37 @@ def create_goal_if_missing(user_id: str, goal_type: str):
         "goal_type": goal_type,
         "status": "active",
         "created_at": datetime.utcnow().isoformat(),
-        "reason": "User explicitly requested goal"
+        "reason": reason
     })
     print(f"🎯 Created goal: {goal_type}")
     return True
+
+
+async def infer_goal_type_llm(user_input: str) -> str:
+    prompt = f"""
+You are an intent classifier for a mental health assistant. Based on the user's message, return a short goal type string that describes the purpose of the goal they want to create.
+
+Examples:
+- "I want to sleep better" → improve_sleep
+- "Help me manage stress" → reduce_stress
+- "I need to feel happier" → increase_joy
+- "Can you help me journal?" → self_care_journaling
+
+Only return the goal type string.
+
+User: {user_input}
+Goal type:
+"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post("http://13.203.198.145:8000/query", json={"query": prompt}, timeout=10.0)
+            if response.status_code == 200:
+                goal_type = response.json().get("answer", "").strip()
+                return goal_type if goal_type else "self_care_misc"
+    except Exception as e:
+        print("LLM intent parser failed:", str(e))
+    return "self_care_misc"
+
 
 # Main chat route
 @app.post("/chat")
@@ -83,11 +110,12 @@ async def chat(message: Message, request: Request):
 
     # Step 1: Explicit goal creation
     if "create a goal" in user_input.lower() or "help me" in user_input.lower():
-        created = create_goal_if_missing(user_id, "self-care goal")
+        goal_type = await infer_goal_type_llm(user_input)
+        created = create_goal_if_missing(user_id, goal_type, reason=f"User requested goal: {goal_type}")
         if created:
-            return {"response": "🌱 I've created your goal: *self-care goal*. Let’s keep growing together."}
+            return {"response": f"🌱 I've created your goal: *{goal_type.replace('_', ' ')}*. Let’s keep growing together."}
         else:
-            return {"response": "🌿 You already have an active goal: *self-care goal*. Let me know how it's going!"}
+            return {"response": f"🌿 You already have an active goal: *{goal_type.replace('_', ' ')}*. Let me know how it's going!"}
 
     # Step 2: Check for active goals and respond
     active_goals = get_active_goals(user_id)
