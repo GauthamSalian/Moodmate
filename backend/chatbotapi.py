@@ -28,7 +28,7 @@ BASE_PROMPT = """
 You are Lumi, a compassionate mental health support assistant. You help users who are feeling stressed, anxious, or overwhelmed.
 You are not a medical professional and never offer clinical advice or diagnosis.
 Always encourage users to reach out to licensed therapists or mental health hotlines if they are in crisis.
-Keep your responses warm, empathetic, and supportive. Keep the responses concise and to the point.
+Keep your responses warm, empathetic, and supportive. Keep the responses concise and to the point preferrably not more than 2 sentences.
 """
 
 # Request schema
@@ -58,7 +58,6 @@ def complete_goal(user_id: str, goal_type: str):
             )
             print(f"✅ Goal '{goal_type}' marked as completed.")
             break
-
 def create_goal_if_missing(user_id: str, goal_type: str, reason: str = "User explicitly requested goal"):
     active = get_active_goals(user_id)
     if any(g["goal_type"] == goal_type for g in active):
@@ -100,7 +99,6 @@ Goal type:
         print("LLM intent parser failed:", str(e))
     return "self_care_misc"
 
-
 # Main chat route
 @app.post("/chat")
 async def chat(message: Message, request: Request):
@@ -108,7 +106,6 @@ async def chat(message: Message, request: Request):
     user_id = message.user_id
     print(f"🧠 User Input: {user_input}")
 
-    # Step 1: Explicit goal creation
     if "create a goal" in user_input.lower() or "help me" in user_input.lower():
         goal_type = await infer_goal_type_llm(user_input)
         created = create_goal_if_missing(user_id, goal_type, reason=f"User requested goal: {goal_type}")
@@ -117,20 +114,33 @@ async def chat(message: Message, request: Request):
         else:
             return {"response": f"🌿 You already have an active goal: *{goal_type.replace('_', ' ')}*. Let me know how it's going!"}
 
-    # Step 2: Check for active goals and respond
+
+    # Step 1: Check for active goals and respond proactively
     active_goals = get_active_goals(user_id)
     for goal in active_goals:
-        if goal["goal_type"] == "self-care goal":
-            if is_affirmation(user_input):
-                complete_goal(user_id, "self-care goal")
-                return {"response": "🌈 That’s wonderful to hear! I’ve marked your goal as completed. Keep taking care of yourself."}
-            return {"response": "💭 Just checking in — did you get a chance to work on your *self-care goal* today?"}
+        goal_type = goal["goal_type"]
+        last_check = goal.get("last_triggered", "")
+        today = datetime.utcnow().date().isoformat()
 
-    # Step 3: Fallback to AWS RAG
+        # If not checked today, ask
+        if last_check != today:
+            goal_table.update_item(
+                Key={"user_id": goal["user_id"], "goal_id": goal["goal_id"]},
+                UpdateExpression="SET last_triggered = :t",
+                ExpressionAttributeValues={":t": today}
+            )
+            return {"response": f"🌇 Just checking in — did you get a chance to work on your *{goal_type.replace('_', ' ')}* goal today?"}
+
+        # If user affirms, mark as completed
+        if is_affirmation(user_input):
+            complete_goal(user_id, goal_type)
+            return {"response": f"🌈 That’s wonderful to hear! I’ve marked your *{goal_type.replace('_', ' ')}* goal as completed. Keep taking care of yourself."}
+
+    # Step 2: Fallback to AWS RAG
     full_prompt = f"{BASE_PROMPT.strip()}\n\nUser: {user_input}"
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post("http://13.203.198.145:8000/query", json={"query": full_prompt}, timeout=60.0)
+            response = await client.post("http://15.206.147.152:8000/query", json={"query": full_prompt}, timeout=60.0)
             if response.status_code != 200:
                 print("❌ AWS RAG Error:", response.text)
                 return {"response": "⚠️ AWS returned an error."}
