@@ -9,8 +9,19 @@ from ibm_watsonx_ai import APIClient
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from collections import defaultdict, Counter
-from dotenv import load_dotenv
-load_dotenv()
+from dotenv import dotenv_values
+import boto3
+
+dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
+
+# Step 1: Load env values from file
+env_vars = dotenv_values(r"C:\Users\ASUS\Desktop\MoodMate\Moodmate\backend\.env")
+
+# Step 2: Inject them into os.environ
+for key, value in env_vars.items():
+    os.environ[key] = value
+
+# Step 3: Now retrieve using os.getenv()
 BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
 print("BEARER_TOKEN:", "Loaded" if BEARER_TOKEN else "Missing or Empty")
 
@@ -51,6 +62,24 @@ def get_user_id(username):
     else:
         raise Exception(f"User not found or API error: {resp_json}")
 
+def store_analysis(tweet_id, text, harm, confidence, comment):
+    table = dynamodb.Table('TweetRiskAnalysis')
+
+    existing_item = table.get_item(Key={'tweet_id': tweet_id})
+    if 'Item' in existing_item:
+        print(f"⚠️ Tweet {tweet_id} already exists in DB. Skipping.")
+        return {"status": "skipped", "reason": "already exists"}
+    
+    response = table.put_item(Item={
+        'tweet_id': tweet_id,
+        'text': text,
+        'risk_detected': harm,
+        'confidence_score': confidence,
+        'explanation': comment
+    })
+    return response
+
+
 def get_user_tweets(user_id, max_results=5):
     url = f"https://api.twitter.com/2/users/{user_id}/tweets"
     headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
@@ -60,12 +89,13 @@ def get_user_tweets(user_id, max_results=5):
     }
     response = requests.get(url, headers=headers, params=params)
     resp_json = response.json()
+    print("Response JSON:", json.dumps(resp_json, indent=2))  # Debugging line
     if "data" in resp_json:
         return resp_json["data"]
     else:
         return []
 
-def analyze_tweet(text):
+def analyze_tweet(tweet_id, text):
     try:
         prompt = f"""
             <risk_evaluation>
@@ -98,6 +128,8 @@ def analyze_tweet(text):
             probability_of_risk = float(confidence_str)
         except ValueError:
             probability_of_risk = 0.0
+        tweet_id = str(tweet_id) if tweet_id else "unknown_id"
+        store_analysis(tweet_id, text, label, confidence_str, explanation)
 
         return {
             "text": text,
@@ -120,10 +152,10 @@ def analyze_tweets(username: str, max_results: int = 5):
     try:
         user_id = get_user_id(username)
         tweets = get_user_tweets(user_id, max_results=max_results)
-        tweet_data = [{"date": tweet["created_at"], "text": tweet["text"]} for tweet in tweets]
+        tweet_data = [{"id": tweet["id"], "date": tweet["created_at"], "text": tweet["text"]} for tweet in tweets]
         results = []
         for tweet in tweet_data:
-            result = analyze_tweet(tweet["text"])
+            result = analyze_tweet(tweet["id"], tweet["text"])
             results.append({
                 "date": tweet["date"],
                 "text": tweet["text"],
@@ -142,11 +174,11 @@ def analyze_all(username: str, max_results: int = 5):
         user_id = get_user_id(username)
         tweets = get_user_tweets(user_id, max_results=max_results)
 
-        tweet_data = [{"date": tweet["created_at"], "text": tweet["text"]} for tweet in tweets]
+        tweet_data = [{"id": tweet["id"], "date": tweet["created_at"], "text": tweet["text"]} for tweet in tweets]
 
         results = []
         for tweet in tweet_data:
-            result = analyze_tweet(tweet["text"])
+            result = analyze_tweet(tweet["id"], tweet["text"])
             results.append({
                 "date": tweet["date"],
                 "text": tweet["text"],
