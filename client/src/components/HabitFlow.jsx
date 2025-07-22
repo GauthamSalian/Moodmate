@@ -6,6 +6,8 @@ import html2canvas from 'html2canvas';
 import { Particles } from "react-tsparticles";
 import { tsParticles } from "tsparticles-engine";
 import { loadFull } from 'tsparticles';
+import { v4 as uuidv4 } from 'uuid';
+
 
 
 const rankMessages = {
@@ -35,6 +37,8 @@ const HabitFlow = () => {
   const [level, setLevel] = useState(1);
   const [levelUpVisible, setLevelUpVisible] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [habitList, setHabitList] = useState([]);
+  const [habitId, setHabitId] = useState(null);
 
   const audioRef = useRef(null);
   const shareRef = useRef(null);
@@ -62,6 +66,19 @@ const HabitFlow = () => {
     }));
   }, [currentHabits, selectedBadHabit, chosenReplacement, showReminder, streak, level]);
 
+  useEffect(() => {
+    const fetchHabits = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/habitflow/get-progress?user_id=demo_user");
+        const data = await res.json();
+        setHabitList(data.habits || []);
+      } catch (err) {
+        console.error("❌ Failed to fetch habits:", err);
+      }
+    };
+    fetchHabits();
+  }, []);
+
   const addHabit = () => {
     if (inputHabit.trim() !== '') {
       setCurrentHabits([...currentHabits, inputHabit.trim()]);
@@ -85,13 +102,18 @@ const HabitFlow = () => {
       }
     };
 
+  const fetchHabits = async () => {
+    const res = await fetch("http://localhost:8000/habitflow/get-progress?user_id=demo_user");
+    const data = await res.json();
+    console.log("🧠 Retrieved habits:", data.habits);
+  };
 
   const handleChooseReplacement = (habit) => {
     setChosenReplacement(habit);
     setShowReminder(true);
   };
 
-  const completeHabit = () => {
+  const completeHabit = async () => {
     const newStreak = streak + 1;
     setStreak(newStreak);
     if (newStreak % 5 === 0) {
@@ -103,6 +125,25 @@ const HabitFlow = () => {
         setLevelUpVisible(false);
         setShowConfetti(false);
       }, 4000);
+    }
+
+    // Save to backend
+    try {
+      await fetch("http://localhost:8000/habitflow/save-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: "demo_user",  // Replace with dynamic user if available
+          habit_name: selectedBadHabit,
+          replacement_habit: chosenReplacement,
+          streak: newStreak,
+          level: newStreak % 5 === 0 ? level + 1 : level,
+          last_completed: new Date().toISOString().split("T")[0]  // "YYYY-MM-DD"
+        })
+      });
+      console.log("✅ Habit progress saved");
+    } catch (err) {
+      console.error("❌ Failed to save habit progress:", err);
     }
     setRewardEarned(true);
     setTimeout(() => setRewardEarned(false), 3000);
@@ -116,6 +157,25 @@ const HabitFlow = () => {
     link.href = canvas.toDataURL();
     link.click();
   };
+
+  const incrementStreak = async (habitId) => {
+    try {
+      await fetch("http://localhost:8000/habitflow/increment-streak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: "demo_user", habit_id: habitId })
+      });
+      console.log("✅ Streak incremented");
+
+      // Refresh the habit list
+      const res = await fetch("http://localhost:8000/habitflow/get-progress?user_id=demo_user");
+      const data = await res.json();
+      setHabitList(data.habits || []);
+    } catch (err) {
+      console.error("❌ Failed to increment streak:", err);
+    }
+  };
+
 
   const currentRank = getRank(level);
   const rankMessage = rankMessages[currentRank];
@@ -147,7 +207,7 @@ const HabitFlow = () => {
         detectRetina: true
       }} />
 
-      <div ref={shareRef} className="max-w-2xl mx-auto mt-10 p-6 bg-white/80 backdrop-blur-lg shadow-2xl rounded-3xl space-y-6 border border-purple-200">
+      <div ref={shareRef} className="max-w-2xl mx-auto p-6 bg-white/80 backdrop-blur-lg shadow-2xl rounded-3xl space-y-6 border border-purple-200">
         <h2 className="text-3xl font-bold text-center text-purple-800">🌱 HabitFlow - Build Better Habits</h2>
         <audio ref={audioRef} src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto" />
         {showConfetti && <Confetti recycle={false} numberOfPieces={300} />} 
@@ -194,6 +254,30 @@ const HabitFlow = () => {
             </div>
           </div>
         )}
+
+        {habitList.map((habit, i) => (
+          <div key={i} className="bg-white border border-gray-300 rounded-lg shadow-sm px-4 py-3 mb-4 space-y-2">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-purple-800 capitalize">{habit.habit_name}</h2>
+              <button
+                onClick={() => incrementStreak(habit.habit_id)}
+                className="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition"
+              >
+                ➕ Add Day
+              </button>
+            </div>
+
+            <p className="text-gray-700">
+              <span className="font-medium">Replacement:</span> <span className="italic">{habit.replacement_habit}</span>
+            </p>
+
+            <div className="flex items-center justify-between text-sm text-gray-600 pt-1">
+              <span>🔥 <strong>{habit.streak_days}</strong> day streak</span>
+              <span>🏅 Level <strong>{habit.level}</strong></span>
+              <span>📅 Last: {habit.last_completed}</span>
+            </div>
+          </div>
+        ))}
 
         {chosenReplacement && showReminder && (
           <div className="bg-white shadow-md rounded-xl p-4 space-y-3 text-center">
