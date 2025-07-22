@@ -116,7 +116,7 @@ Goal type:
 """
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post("http://52.66.246.193:8000/query", json={"query": prompt}, timeout=10.0)
+            response = await client.post("http://52.66.246.193:8000/query", json={"query": prompt}, timeout=60.0)
             if response.status_code == 200:
                 goal_type = response.json().get("answer", "").strip()
                 return goal_type if goal_type else "self_care_misc"
@@ -130,6 +130,8 @@ async def chat(message: Message, request: Request):
     user_input = message.user_input.strip()
     user_id = message.user_id
     print(f"🧠 User Input: {user_input}")
+
+
 
     # Step 0: Check if awaiting goal duration
     if recent_suggestions.get(user_id, {}).get("awaiting_duration"):

@@ -21,7 +21,6 @@ const menuItems = [
   { icon: <BotMessageSquare size={18} />, label: 'Chatbot', path: '/chatbot' },
   { icon: <ChartNoAxesCombined size={18} />, label: 'Stress Dashboard', path: '/dashboard' },
   { icon: <SquareActivity size={18} />, label: 'Input Monitor', path: '/inputs' },
-  { icon: <Logs size={18} />, label: 'Chat Logs', path: '/logs' },
   { icon: <HeartHandshake size={18} />, label: 'Book a Session', path: '/book' },
   { icon: <Hash size={18} />, label: 'Twitter Analyzer', path: '/twitter' },
   { icon: <HeartPulse size={18} />, label: 'Google Fit', path: '/sleep' },,

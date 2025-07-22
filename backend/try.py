@@ -1,15 +1,9 @@
-import os
-from dotenv import load_dotenv
+import requests
 
-# Load .env file
-load_dotenv(dotenv_path=r"C:\Users\ASUS\Desktop\MoodMate\Moodmate\backend\.env")  # Adjust if needed
-
-# Debug prints
-print("🔍 Checking Environment Variable")
-token = os.getenv("TWITTER_BEARER_TOKEN")
-
-if token:
-    print("✅ TWITTER_BEARER_TOKEN loaded successfully!")
-    print("Token preview (first 10 chars):", token[:10] + "...")
-else:
-    print("❌ TWITTER_BEARER_TOKEN is missing or empty.")
+res = requests.post("http://localhost:8000/save-health-data", json={
+    "user_id": "demo_user",
+    "date": "2025-07-21",
+    "sleep": 7.5,
+    "hrv": 58.3
+})
+print(res.json())
