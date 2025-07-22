@@ -3,15 +3,10 @@ import { Sparkles, AlarmClock, Gift, Flame, ShieldCheck, Download } from 'lucide
 import { motion, AnimatePresence } from 'framer-motion';
 import Confetti from 'react-confetti';
 import html2canvas from 'html2canvas';
-import Particles from 'react-tsparticles';
+import { Particles } from "react-tsparticles";
+import { tsParticles } from "tsparticles-engine";
 import { loadFull } from 'tsparticles';
 
-const habitSuggestions = {
-  "late-night snacking": ["Drink herbal tea", "Brush teeth after dinner", "Keep fruit instead of snacks"],
-  "scrolling social media": ["Read 5 pages of a book", "Go for a walk", "Meditate for 5 minutes"],
-  "procrastinating work": ["Use Pomodoro timer", "Start with a 2-min task", "Write a to-do list"],
-  "not exercising": ["Do 10 push-ups", "Stretch for 2 minutes", "Walk after meals"]
-};
 
 const rankMessages = {
   Bronze: 'You’ve taken the first step — keep the momentum going! 💪',
@@ -74,10 +69,22 @@ const HabitFlow = () => {
     }
   };
 
-  const handleSelectBadHabit = (habit) => {
-    setSelectedBadHabit(habit);
-    setSuggestedHabits(habitSuggestions[habit.toLowerCase()] || []);
-  };
+  const handleSelectBadHabit = async (habit) => {
+      setSelectedBadHabit(habit);
+      try {
+        const res = await fetch("http://localhost:8000/suggest_replacements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bad_habit: habit }),
+        });
+        const data = await res.json();
+        setSuggestedHabits(data.suggestions || []);
+      } catch (err) {
+        console.error("Failed to fetch suggestions:", err);
+        setSuggestedHabits(["Take a short walk", "Drink water", "Rest mindfully"]); // fallback
+      }
+    };
+
 
   const handleChooseReplacement = (habit) => {
     setChosenReplacement(habit);
@@ -113,8 +120,8 @@ const HabitFlow = () => {
   const currentRank = getRank(level);
   const rankMessage = rankMessages[currentRank];
 
-  const particlesInit = async (main) => {
-    await loadFull(main);
+  const particlesInit = async () => {
+    await loadFull(tsParticles);
   };
 
   return (
