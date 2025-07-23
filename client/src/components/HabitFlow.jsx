@@ -1,234 +1,175 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, AlarmClock, Gift, Flame, ShieldCheck, Download } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Confetti from 'react-confetti';
-import html2canvas from 'html2canvas';
-import Particles from 'react-tsparticles';
-import { loadFull } from 'tsparticles';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 
-const habitSuggestions = {
-  "late-night snacking": ["Drink herbal tea", "Brush teeth after dinner", "Keep fruit instead of snacks"],
-  "scrolling social media": ["Read 5 pages of a book", "Go for a walk", "Meditate for 5 minutes"],
-  "procrastinating work": ["Use Pomodoro timer", "Start with a 2-min task", "Write a to-do list"],
-  "not exercising": ["Do 10 push-ups", "Stretch for 2 minutes", "Walk after meals"]
-};
 
-const rankMessages = {
-  Bronze: 'You’ve taken the first step — keep the momentum going! 💪',
-  Silver: 'Awesome work! You’re building consistency. 🚀',
-  Gold: 'You’re crushing it! Keep shining! 🌟',
-  Diamond: 'You’re unstoppable! True habit master! 👑'
-};
+export default function HabitFlowDashboard() {
+  const [habits, setHabits] = useState([]);
+  const [darkMode, setDarkMode] = useState(false);
+  const [selectedHabit, setSelectedHabit] = useState(null);
+  const [badHabitInput, setBadHabitInput] = useState("");
+  const [habitSuggestions, setHabitSuggestions] = useState([]);
 
-const getRank = (level) => {
-  if (level >= 15) return 'Diamond';
-  if (level >= 10) return 'Gold';
-  if (level >= 5) return 'Silver';
-  return 'Bronze';
-};
+  const [newHabit, setNewHabit] = useState({
+    habit_name: "",
+    replacement_habit: "",
+    streak_days: 0,
+    level: 1,
+    last_completed: "",
+  });
 
-const HabitFlow = () => {
-  const [currentHabits, setCurrentHabits] = useState([]);
-  const [inputHabit, setInputHabit] = useState('');
-  const [selectedBadHabit, setSelectedBadHabit] = useState('');
-  const [suggestedHabits, setSuggestedHabits] = useState([]);
-  const [customHabit, setCustomHabit] = useState('');
-  const [chosenReplacement, setChosenReplacement] = useState('');
-  const [showReminder, setShowReminder] = useState(false);
-  const [rewardEarned, setRewardEarned] = useState(false);
-  const [streak, setStreak] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [levelUpVisible, setLevelUpVisible] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
+  // 🧠 Fetch habit streaks
+  const fetchHabits = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/habitflow/get-progress?user_id=demo_user");
+      const data = await res.json();
+      setHabits(data.habits || []);
+    } catch (err) {
+      console.error("Failed to fetch habits:", err);
+    }
+  };
 
-  const audioRef = useRef(null);
-  const shareRef = useRef(null);
+  // ➕ Increment streak
+  const incrementStreak = async (habitId) => {
+    await fetch("http://localhost:8000/habitflow/increment-streak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: "demo_user", habit_id: habitId })
+    });
+    fetchHabits(); // refresh UI
+  };
+
+  // 💡 Suggest replacements
+  const fetchSuggestions = async () => {
+    try {
+      const { data } = await axios.post("http://localhost:8000/suggest_replacements", {
+        bad_habit: badHabitInput,
+      });
+      setHabitSuggestions(data.suggestions || []);
+    } catch (e) {
+      console.error("🧨 Suggest error:", e);
+    }
+  };
+
+  // ✅ Save progress for new habits
+  const saveProgress = async () => {
+    try {
+      await axios.post("http://localhost:8000/habitflow/save-progress", {
+        user_id: "demo_user",
+        habit_id: uuidv4(),
+        ...newHabit,
+      });
+      alert("✅ Progress saved!");
+      fetchHabits();
+    } catch (e) {
+      console.error("🧨 Save error:", e);
+    }
+  };
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('habitflowData'));
-    if (saved) {
-      setCurrentHabits(saved.currentHabits || []);
-      setChosenReplacement(saved.chosenReplacement || '');
-      setSelectedBadHabit(saved.selectedBadHabit || '');
-      setShowReminder(saved.showReminder || false);
-      setStreak(saved.streak || 0);
-      setLevel(saved.level || 1);
-    }
+    fetchHabits();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('habitflowData', JSON.stringify({
-      currentHabits,
-      selectedBadHabit,
-      chosenReplacement,
-      showReminder,
-      streak,
-      level
-    }));
-  }, [currentHabits, selectedBadHabit, chosenReplacement, showReminder, streak, level]);
-
-  const addHabit = () => {
-    if (inputHabit.trim() !== '') {
-      setCurrentHabits([...currentHabits, inputHabit.trim()]);
-      setInputHabit('');
-    }
-  };
-
-  const handleSelectBadHabit = (habit) => {
-    setSelectedBadHabit(habit);
-    setSuggestedHabits(habitSuggestions[habit.toLowerCase()] || []);
-  };
-
-  const handleChooseReplacement = (habit) => {
-    setChosenReplacement(habit);
-    setShowReminder(true);
-  };
-
-  const completeHabit = () => {
-    const newStreak = streak + 1;
-    setStreak(newStreak);
-    if (newStreak % 5 === 0) {
-      setLevel(prev => prev + 1);
-      setLevelUpVisible(true);
-      setShowConfetti(true);
-      if (audioRef.current) audioRef.current.play();
-      setTimeout(() => {
-        setLevelUpVisible(false);
-        setShowConfetti(false);
-      }, 4000);
-    }
-    setRewardEarned(true);
-    setTimeout(() => setRewardEarned(false), 3000);
-  };
-
-  const captureCard = async () => {
-    if (!shareRef.current) return;
-    const canvas = await html2canvas(shareRef.current);
-    const link = document.createElement('a');
-    link.download = `HabitFlow_Progress_Level${level}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
-  };
-
-  const currentRank = getRank(level);
-  const rankMessage = rankMessages[currentRank];
-
-  const particlesInit = async (main) => {
-    await loadFull(main);
-  };
-
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-blue-50 to-purple-100">
-      <Particles id="tsparticles" init={particlesInit} options={{
-        fullScreen: { enable: false },
-        background: { color: "transparent" },
-        fpsLimit: 60,
-        interactivity: {
-          events: { onClick: { enable: true, mode: "push" }, onHover: { enable: true, mode: "repulse" }, resize: true },
-          modes: { push: { quantity: 4 }, repulse: { distance: 50, duration: 0.4 } }
-        },
-        particles: {
-          color: { value: ["#6D28D9", "#A78BFA", "#4F46E5"] },
-          links: { enable: true, color: "#a855f7", distance: 120 },
-          collisions: { enable: true },
-          move: { direction: "none", enable: true, outModes: "bounce", random: false, speed: 1, straight: false },
-          number: { density: { enable: true, area: 800 }, value: 60 },
-          opacity: { value: 0.5 },
-          shape: { type: "circle" },
-          size: { value: { min: 1, max: 3 } }
-        },
-        detectRetina: true
-      }} />
+    <div className={`${darkMode ? "dark" : ""}`}>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 px-4 py-6">
+        <div className="max-w-3xl mx-auto space-y-6">
 
-      <div ref={shareRef} className="max-w-2xl mx-auto mt-10 p-6 bg-white/80 backdrop-blur-lg shadow-2xl rounded-3xl space-y-6 border border-purple-200">
-        <h2 className="text-3xl font-bold text-center text-purple-800">🌱 HabitFlow - Build Better Habits</h2>
-        <audio ref={audioRef} src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto" />
-        {showConfetti && <Confetti recycle={false} numberOfPieces={300} />} 
-
-        <div className="text-right">
-          <button onClick={captureCard} className="text-xs flex items-center gap-1 text-purple-700 hover:underline">
-            <Download className="h-4 w-4" /> Share Progress
-          </button>
-        </div>
-
-        <div className="bg-white shadow-md rounded-xl p-4 space-y-2">
-          <p className="font-semibold">1. Add your current habits:</p>
-          <div className="flex gap-2">
-            <input value={inputHabit} onChange={(e) => setInputHabit(e.target.value)} placeholder="e.g., late-night snacking" className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
-            <button onClick={addHabit} className="px-4 py-2 rounded-md font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">Add</button>
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400">🌱 HabitFlow</h1>
           </div>
-          <ul className="list-disc list-inside text-sm">
-            {currentHabits.map((habit, i) => (
-              <li key={i} className="cursor-pointer hover:text-purple-600" onClick={() => handleSelectBadHabit(habit)}>
-                {habit}
-              </li>
-            ))}
-          </ul>
-        </div>
 
-        {selectedBadHabit && (
-          <div className="bg-white shadow-md rounded-xl p-4 space-y-3">
-            <p className="font-semibold">
-              2. Replace <span className="italic text-purple-600">{selectedBadHabit}</span> with:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {suggestedHabits.map((h, i) => (
-                <button key={i} onClick={() => handleChooseReplacement(h)} className="flex items-center gap-2 px-4 py-2 rounded-md border border-purple-600 text-purple-600 hover:bg-purple-50">
-                  <Sparkles className="h-4 w-4" /> {h}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4">
-              <p className="text-sm text-gray-600">Or enter your own replacement habit:</p>
-              <div className="flex gap-2 mt-2">
-                <input value={customHabit} onChange={(e) => setCustomHabit(e.target.value)} placeholder="e.g., Journal for 2 minutes" className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                <button onClick={() => handleChooseReplacement(customHabit)} className="px-4 py-2 rounded-md font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 transition">Use</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {chosenReplacement && showReminder && (
-          <div className="bg-white shadow-md rounded-xl p-4 space-y-3 text-center">
-            <p className="text-lg font-semibold text-purple-700">🎯 New Habit Chosen:</p>
-            <p className="text-green-600 font-bold text-xl">{chosenReplacement}</p>
-            <p className="text-sm text-gray-500 flex items-center justify-center">
-              <AlarmClock className="h-4 w-4 mr-1" /> You'll be reminded daily to practice this habit.
-            </p>
-            <motion.div 
-              className="text-sm flex flex-col items-center justify-center text-orange-600"
-              initial={{ scale: 0.9 }} 
-              animate={{ scale: [1, 1.05, 1] }} 
-              transition={{ repeat: Infinity, duration: 2 }}
-            >
-              <motion.div className="rounded-full bg-yellow-100 px-4 py-1 font-semibold shadow">
-                Streak: {streak} days | Level: {level} - {currentRank}
-              </motion.div>
-            </motion.div>
-            <button onClick={completeHabit} className="mt-4 px-4 py-2 rounded-md font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">I Did It Today ✅</button>
-            <AnimatePresence>
-              {levelUpVisible && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1.1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="text-purple-600 font-bold mt-3 text-lg"
+          {/* Habit List */}
+          {habits.length === 0 && <p className="text-gray-600 dark:text-gray-400">No habits found.</p>}
+          {habits.map((habit, idx) => (
+            <div key={idx} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl p-4 shadow space-y-2">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-300 capitalize">{habit.habit_name}</h2>
+                <button
+                  onClick={() => incrementStreak(habit.habit_id)}
+                  className="text-sm bg-blue-600 dark:bg-blue-400 text-white dark:text-gray-900 px-3 py-1 rounded hover:bg-blue-700 dark:hover:bg-blue-300 transition"
                 >
-                  🎉 Milestone! You're now level {level} - {currentRank}!
-                  <p className="text-sm mt-1 text-gray-700">{rankMessage}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {rewardEarned && (
-              <div className="text-green-700 mt-3 flex items-center justify-center font-semibold">
-                <Gift className="h-5 w-5 mr-2" /> Great job! You've earned a reward!
+                  ➕ Add Day
+                </button>
               </div>
-            )}
+              <p><span className="font-medium">Replacement:</span> <em>{habit.replacement_habit}</em></p>
+              <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400 pt-1">
+                <span>🔥 <strong>{habit.streak_days}</strong> day streak</span>
+                <span>🏅 Level <strong>{habit.level}</strong></span>
+                <span>📅 Last: {habit.last_completed}</span>
+              </div>
+            </div>
+          ))}
+
+          {/* Suggest Replacements */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl p-4 shadow space-y-2">
+            <h3 className="text-lg font-semibold text-purple-700 dark:text-purple-300">💡 Need Replacement Ideas?</h3>
+            <input
+              type="text"
+              value={badHabitInput}
+              onChange={(e) => setBadHabitInput(e.target.value)}
+              placeholder="Enter a bad habit"
+              className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-black text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+            />
+            <button
+              onClick={fetchSuggestions}
+              className="px-4 py-2 bg-purple-600 dark:bg-purple-400 text-white dark:text-gray-900 rounded hover:brightness-110 transition"
+            >
+              Suggest Replacements
+            </button>
+            <ul className="list-disc pl-6 pt-2">
+              {habitSuggestions.map((s, idx) => (
+                <li key={idx}>
+                  <button
+                    onClick={() => setSelectedHabit({
+                      bad_habit: badHabitInput,
+                      habit_id: uuidv4(),
+                      replacement_habit: s,
+                      streak_days: 0,
+                      level: 1,
+                      last_completed: new Date().toISOString().slice(0, 10) // yyyy-mm-dd
+                    })}
+                    className="text-left w-full hover:underline text-purple-700 dark:text-purple-300"
+                  >
+                    🌿 {s}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-        )}
+
+          {selectedHabit && (
+            <div className="mt-4 p-4 bg-green-50 dark:bg-gray-700 border border-green-300 dark:border-green-500 rounded-xl space-y-2">
+              <h4 className="text-md font-semibold text-green-800 dark:text-green-200">🆕 Suggested Habit</h4>
+              <p><strong>Bad Habit:</strong> {selectedHabit.bad_habit}</p>
+              <p><strong>Replacement:</strong> {selectedHabit.replacement_habit}</p>
+              <p><strong>Start Date:</strong> {selectedHabit.last_completed}</p>
+              <p><strong>Level:</strong> {selectedHabit.level}</p>
+              <button
+                onClick={async () => {
+                  await axios.post("http://localhost:8000/habitflow/save-progress", {
+                    user_id: "demo_user",
+                    habit_id: selectedHabit.habit_id, // ✅ Add this field
+                    habit_name: selectedHabit.bad_habit,
+                    replacement_habit: selectedHabit.replacement_habit,
+                    streak: selectedHabit.streak_days, // ✅ Renamed to match FastAPI's expected field
+                    level: selectedHabit.level,
+                    last_completed: selectedHabit.last_completed,
+                  });
+                  alert("🎉 Progress saved!");
+                  fetchHabits();
+                  setSelectedHabit(null);
+                }}
+                className="px-4 py-2 bg-green-600 dark:bg-green-400 text-white dark:text-gray-900 rounded hover:brightness-110 transition"
+              >
+                💾 Save Progress
+              </button>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );
-};
-
-export default HabitFlow;
+}

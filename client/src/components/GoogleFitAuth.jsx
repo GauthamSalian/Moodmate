@@ -29,6 +29,28 @@ function GoogleFitAuth({ onDataFetched }) {
     setHistory(Object.entries(current).map(([date, entry]) => ({ date, ...entry })));
   };
 
+  const handleSaveToDynamoDB = async (data) => {
+    const payload = {
+      user_id: localStorage.getItem("user_id") || "test_user",  // Replace with real auth
+      date: selectedDate,
+      sleep: data.sleep,
+      hrv: data.hrv
+    };
+
+    try {
+      const res = await fetch("http://localhost:8000/save-health-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      console.log("✅ Saved to DynamoDB:", result.message);
+    } catch (error) {
+      console.error("❌ Failed to save to DynamoDB:", error);
+    }
+  };
+
+
   const fetchGoogleFitData = async (accessToken) => {
     setStatus("loading");
 
@@ -92,7 +114,9 @@ function GoogleFitAuth({ onDataFetched }) {
 
       saveToHistory(selectedDate, totalSleepHrs, avgHRV);
       if (onDataFetched) {
-        onDataFetched({ sleep: totalSleepHrs, hrv: avgHRV });
+        const data = { sleep: totalSleepHrs, hrv: avgHRV };
+        onDataFetched(data);
+        handleSaveToDynamoDB(data);
       }
     } catch (err) {
       console.error(err);
@@ -133,7 +157,9 @@ function GoogleFitAuth({ onDataFetched }) {
       setStatus("success");
       saveToHistory(selectedDate, sleepVal, hrvVal);
       if (onDataFetched) {
-        onDataFetched({ sleep: sleepVal, hrv: hrvVal });
+        const data = { sleep: sleepVal, hrv: hrvVal };
+        onDataFetched(data);
+        handleSaveToDynamoDB(data);  // ✅ Save to DynamoDB
       }
     } else {
       setStatus("error");

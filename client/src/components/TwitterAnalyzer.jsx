@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Line } from "react-chartjs-2";
-import { Chart, Filler } from "chart.js";
-Chart.register(Filler);
+import { Chart, Filler, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, } from "chart.js";
+Chart.register(Filler,LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
 import { format } from "date-fns";
 
 const TwitterAnalyzer = () => {
@@ -11,8 +11,6 @@ const TwitterAnalyzer = () => {
   const [selectedEmotion, setSelectedEmotion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const chartRef = useRef();
-  const [redraw, setRedraw] = useState(false);
 
   const twitterDates = twitterResults ? twitterResults.map(tweet => tweet.date) : [];
   const twitterProbabilities = twitterResults ? twitterResults.map(tweet => Number(tweet.probability_of_risk)) : [];
@@ -79,13 +77,6 @@ const TwitterAnalyzer = () => {
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (chartRef.current) {
-      setRedraw(true);
-      setTimeout(() => setRedraw(false), 0);
-    }
-  }, [twitterResults]);
-
   return (
     <div className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-4 rounded shadow transition-colors duration-300">
       <h3 className="text-lg font-semibold mb-2">Twitter Stress Analysis</h3>
@@ -110,10 +101,8 @@ const TwitterAnalyzer = () => {
         <div className="mt-8 bg-white dark:bg-gray-800 p-4 rounded shadow transition-colors duration-300" style={{ maxWidth: 800, margin: "0 auto" }}>
           <h4 className="font-semibold mb-2">Twitter Risk Over Time</h4>
           <Line
-            ref={chartRef}
             data={twitterRiskChartData}
             options={options}
-            redraw={redraw}
             width={500}
             height={250}
           />

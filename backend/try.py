@@ -1,4 +1,9 @@
-import torch
-print(torch.cuda.is_available())
-print(torch.cuda.device_count())
-print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")
+import requests
+
+res = requests.post("http://localhost:8000/save-health-data", json={
+    "user_id": "demo_user",
+    "date": "2025-07-21",
+    "sleep": 7.5,
+    "hrv": 58.3
+})
+print(res.json())

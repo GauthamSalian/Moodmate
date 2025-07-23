@@ -4,7 +4,6 @@ import Sidebar from './components/Sidebar';
 import ChatbotPage from './components/ChatbotPage';
 import StressDashboard from './components/StressDashboard';
 import InputMonitor from './components/InputMonitor';
-import Logs from './components/Logs';
 import TwitterAnalyzer from './components/TwitterAnalyzer';
 import ChatInterface from './components/ChatInterface';
 import BookingPage from './pages/BookingPage';
@@ -44,7 +43,6 @@ function App() {
             <Route path="/chatbot/*" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
             <Route path="/dashboard" element={<StressDashboard fusionInputs={fusionInputs} />} />
             <Route path="/inputs" element={<InputMonitor setFusionInputs={setFusionInputs} />} />
-            <Route path="/logs" element={<Logs />} />
             <Route path="/twitter" element={<TwitterAnalyzer />} />
             <Route path="/book" element={<BookingPage />} />
             <Route path="/" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
