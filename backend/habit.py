@@ -14,8 +14,10 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
+
 class HabitProgressInput(BaseModel):
     user_id: str
+    habit_id: str
     habit_name: str
     replacement_habit: str
     streak: int
