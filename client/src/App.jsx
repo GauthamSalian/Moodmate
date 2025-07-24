@@ -5,7 +5,6 @@ import Sidebar from './components/Sidebar';
 import ChatbotPage from './components/ChatbotPage';
 import StressDashboard from './components/StressDashboard';
 import InputMonitor from './components/InputMonitor';
-import Logs from './components/Logs';
 import TwitterAnalyzer from './components/TwitterAnalyzer';
 import ChatInterface from './components/ChatInterface';
 import BookingPage from './pages/BookingPage';
@@ -13,6 +12,7 @@ import GoogleFitAuth from './components/GoogleFitAuth';
 import BreathingCatalog from './components/BreathingCatalog';
 import JournalDashboard from './components/JournalDashboard';
 import HabitFlow from './components/HabitFlow';
+import MotivationalPopup from "./components/MotivationalPopup";
 import './App.css';
 
 const AppLayout = () => {
@@ -23,6 +23,7 @@ const AppLayout = () => {
     text: null,
     typing: null
   });
+  const [popupData, setPopupData] = useState(null);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -33,6 +34,18 @@ const AppLayout = () => {
 
   const hideSidebarRoutes = ['/', '/login'];
   const showSidebar = !hideSidebarRoutes.includes(location.pathname);
+
+  React.useEffect(() => {
+    fetch("/api/trigger_check")  // 🛠️ Your endpoint here
+      .then(res => res.json())
+      .then(data => {
+        if (data.show_popup) {
+          setPopupData({
+            message: data.support_message || "Keep going. You've got this. 💙"
+          });
+        }
+      });
+  }, []);
 
   return (
     <div className="flex">
@@ -50,7 +63,6 @@ const AppLayout = () => {
           <Route path="/chatbot/*" element={<ChatbotPage fusionInputs={fusionInputs} setFusionInputs={setFusionInputs} />} />
           <Route path="/dashboard" element={<StressDashboard fusionInputs={fusionInputs} />} />
           <Route path="/inputs" element={<InputMonitor setFusionInputs={setFusionInputs} />} />
-          <Route path="/logs" element={<Logs />} />
           <Route path="/twitter" element={<TwitterAnalyzer />} />
           <Route path="/book" element={<BookingPage />} />
           <Route path="/sleep" element={<GoogleFitAuth onDataFetched={(data) => setFusionInputs(prev => ({ ...prev, ...data }))} />} />
@@ -59,6 +71,9 @@ const AppLayout = () => {
           <Route path="/habits" element={<HabitFlow />} />
         </Routes>
       </div>
+      {popupData && (
+        <MotivationalPopup message={popupData.message} />
+      )}
     </div>
   );
 };

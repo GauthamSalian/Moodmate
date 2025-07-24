@@ -22,8 +22,9 @@ app.add_middleware(
 )
 
 # DynamoDB setup
-dynamodb = boto3.resource("dynamodb")
+dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
 goal_table = dynamodb.Table("UserGoals")
+emotion_table = dynamodb.Table("UserEmotionLogs")  # Optional table for emotion history
 
 # Base prompt
 BASE_PROMPT = """
@@ -37,6 +38,8 @@ Keep your responses warm, empathetic, and supportive. Keep the responses concise
 class Message(BaseModel):
     user_input: str
     user_id: str = "demo_user"
+    emotion: str = None
+    stress: float = None
 
 # Affirmation detection
 def is_affirmation(text: str) -> bool:
@@ -80,6 +83,7 @@ def complete_goal(user_id: str, goal_type: str):
 
             print(f"✅ Goal '{goal_type}' marked as completed.")
             break
+
 def create_goal_if_missing(user_id: str, goal_type: str, duration_days: int, reason: str = "User explicitly requested goal"):
     active = get_active_goals(user_id)
     if any(g["goal_type"] == goal_type for g in active):
@@ -97,7 +101,6 @@ def create_goal_if_missing(user_id: str, goal_type: str, duration_days: int, rea
     })
     print(f"🎯 Created goal: {goal_type} for {duration_days} days")
     return True
-
 
 async def infer_goal_type_llm(user_input: str) -> str:
     prompt = f"""
@@ -129,9 +132,21 @@ Goal type:
 async def chat(message: Message, request: Request):
     user_input = message.user_input.strip()
     user_id = message.user_id
+    emotion = message.emotion
+    stress = message.stress
+
     print(f"🧠 User Input: {user_input}")
+    print(f"🧠 Emotion: {emotion}, Stress Score: {stress}")
 
-
+    # Optional: Log emotion to DB
+    if emotion or stress is not None:
+        emotion_table.put_item(Item={
+            "user_id": user_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "emotion": emotion or "unknown",
+            "stress": stress or 0.5,
+            "message": user_input
+        })
 
     # Step 0: Check if awaiting goal duration
     if recent_suggestions.get(user_id, {}).get("awaiting_duration"):
@@ -141,7 +156,7 @@ async def chat(message: Message, request: Request):
             goal_type = recent_suggestions[user_id]["goal_type"]
             create_goal_if_missing(user_id, goal_type, days, reason="User provided duration")
             del recent_suggestions[user_id]
-            return {"response": f"✅ Your *{goal_type.replace('_', ' ')}* goal has been created for {days} days! I’ll check in daily. 💪"}
+            return {"response": f"✅ Your {goal_type.replace('_', ' ')} goal has been created for {days} days! I’ll check in daily. 💪"}
         except:
             return {"response": "❓ How many days would you like to commit to this goal? You can say something like '5 days'."}
 
@@ -150,33 +165,39 @@ async def chat(message: Message, request: Request):
         goal_type = await infer_goal_type_llm(user_input)
         active = get_active_goals(user_id)
         if any(g["goal_type"] == goal_type for g in active):
-            return {"response": f"🌿 You already have an active goal: *{goal_type.replace('_', ' ')}*. Let me know how it's going!"}
+            return {"response": f"🌿 You already have an active goal: {goal_type.replace('_', ' ')}. Let me know how it's going!"}
         else:
             recent_suggestions[user_id] = {"goal_type": goal_type, "awaiting_duration": True}
-            return {"response": f"📝 How many days would you like to commit to your *{goal_type.replace('_', ' ')}* goal?"}
-    
-        # Step 1: Check for active goals and respond proactively
+            return {"response": f"📝 How many days would you like to commit to your {goal_type.replace('_', ' ')} goal?"}
+
+    # Step 2: Goal follow-up
     active_goals = get_active_goals(user_id)
     for goal in active_goals:
         goal_type = goal["goal_type"]
         last_check = goal.get("last_triggered", "")
         today = datetime.utcnow().date().isoformat()
 
-            # If not checked today, ask
         if last_check != today:
             goal_table.update_item(
                 Key={"user_id": goal["user_id"], "goal_id": goal["goal_id"]},
                 UpdateExpression="SET last_triggered = :t",
                 ExpressionAttributeValues={":t": today}
             )
-            return {"response": f"🌇 Just checking in — did you get a chance to work on your *{goal_type.replace('_', ' ')}* goal today?"}
+            return {"response": f"🌇 Just checking in — did you get a chance to work on your {goal_type.replace('_', ' ')} goal today?"}
 
-            # If user affirms, mark as completed
         if is_affirmation(user_input):
             complete_goal(user_id, goal_type)
-            return {"response": f"🌈 That’s wonderful to hear! I’ve marked your *{goal_type.replace('_', ' ')}* goal as completed. Keep taking care of yourself."}
-    # Step 2: Fallback to AWS RAG
-    full_prompt = f"{BASE_PROMPT.strip()}\n\nUser: {user_input}"
+            return {"response": f"🌈 That’s wonderful to hear! I’ve marked your {goal_type.replace('_', ' ')} goal as completed. Keep taking care of yourself."}
+
+    # Step 3: Fallback to RAG with emotion-aware prompt
+    emotion_context = ""
+    if stress and stress > 0.7:
+        emotion_context = "The user appears to be highly stressed based on facial emotion detection. Please respond in a more comforting and supportive tone.\n"
+    elif emotion in ["sad", "angry", "fearful"]:
+        emotion_context = f"The user seems {emotion}. Be gentle and empathetic in your response.\n"
+
+    full_prompt = f"{BASE_PROMPT.strip()}\n\n{emotion_context}User: {user_input}"
+    
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post("http://52.66.246.193:8000/query", json={"query": full_prompt}, timeout=60.0)
