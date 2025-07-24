@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import Sidebar from './components/Sidebar';
@@ -24,28 +24,41 @@ const AppLayout = () => {
     typing: null
   });
   const [popupData, setPopupData] = useState(null);
-
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  React.useEffect(() => {
-    console.log("🌙 Applying dark mode");
+  useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
 
   const hideSidebarRoutes = ['/', '/login'];
   const showSidebar = !hideSidebarRoutes.includes(location.pathname);
 
-  React.useEffect(() => {
-    fetch("/api/trigger_check")  // 🛠️ Your endpoint here
-      .then(res => res.json())
-      .then(data => {
+  // 🧠 Polling logic (force popup to remount every time)
+  useEffect(() => {
+    const fetchPopup = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/trigger_check");
+        if (!res.ok) throw new Error("Failed to fetch");
+
+        const data = await res.json();
         if (data.show_popup) {
           setPopupData({
-            message: data.support_message || "Keep going. You've got this. 💙"
+            message: data.support_message || "Keep going. You've got this 💙",
+            triggerId: Date.now()  // 👈 unique key on every poll
           });
+        } else {
+          setPopupData(null);
         }
-      });
-  }, []);
+      } catch (err) {
+        console.error("🚨 Popup fetch error:", err);
+      }
+    };
+
+    fetchPopup(); // Run once immediately
+    const interval = setInterval(fetchPopup, 15 * 60 * 1000); // Poll every 1 min
+
+    return () => clearInterval(interval);
+  }, [location.pathname]);
 
   return (
     <div className="flex">
@@ -71,12 +84,15 @@ const AppLayout = () => {
           <Route path="/habits" element={<HabitFlow />} />
         </Routes>
       </div>
+
+      {/* 💬 Motivational popup if needed (remounts with triggerId) */}
       {popupData && (
-        <MotivationalPopup message={popupData.message} />
+        <MotivationalPopup key={popupData.triggerId} message={popupData.message} />
       )}
     </div>
   );
 };
+
 
 function App() {
   return (

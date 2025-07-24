@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 function MotivationalPopup({ message }) {
   const [visible, setVisible] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setVisible(true); // Re-show popup when a new message arrives
+  }, [message]);
 
   if (!visible) return null;
 

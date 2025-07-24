@@ -27,6 +27,8 @@ popup_state = {
 
 dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
 scheduler =BackgroundScheduler()
+print("📅 Starting APScheduler...")  # <-- Add this
+
 # Step 1: Load env values from file
 env_vars = dotenv_values(r"C:\Users\ASUS\Desktop\MoodMate\Moodmate\backend\.env")
 
@@ -81,9 +83,12 @@ def send_supportive_message(tweet_text):
     response = guardian_model.generate(support_prompt)
     full_text = response['results'][0]['generated_text']
     support_msg = re.search(r"<response>(.*?)</response>", full_text, re.DOTALL)
+
     return support_msg.group(1).strip() if support_msg else "Just wanted to say I'm here if you need someone to talk to."
 
+
 def scheduled_check(username):
+    print(f"⏰ scheduled_check triggered at {datetime.utcnow()} for user: {username}")
     try:
         user_id = get_user_id(username)
         tweets = get_user_tweets(user_id, max_results=10)
@@ -100,7 +105,7 @@ def scheduled_check(username):
             if created_at < cutoff:
                 continue
 
-            result = analyze_tweet(tweet['id'], tweet['text'])
+            result = analyze_tweet(tweet['id'], tweet['text'], created_at_str)
 
             if result['probability_of_risk'] > 0.85:
                 popup_state["show_popup"] = True
@@ -236,18 +241,23 @@ def analyze_tweet(tweet_id, text, created_at: str):
             "confidence": "Unknown",
             "probability_of_risk": 0.0,
         }
-
+scheduled_check("GauthamSalian31")
 scheduler.add_job(
     scheduled_check,
     'interval',
-    hours=1,
-    args=["GauthamSalian31"],  # Replace with your actual Twitter username
+    minutes = 17,
+    args=["GauthamSalian31"],
     id='risk_check_job',
     replace_existing=True
-)
+)       
 scheduler.start()
+print("✅ Job added to scheduler")
+print("📅 Scheduler jobs:")
+for job in scheduler.get_jobs():
+    print(f"🕒 Job '{job.id}' next run: {job.next_run_time}")
 
-@router.get("/api/trigger_check")
+
+@app.get("/api/trigger_check")
 def trigger_check():
     return popup_state
 
@@ -327,3 +337,7 @@ def read_analyzed_tweets():
             "risk_analysis": [],
             "error": str(e)
         }
+    
+@app.get("/ping")
+def ping():
+    return {"status": "OK", "time": datetime.utcnow()}
