@@ -40,7 +40,7 @@ const AppLayout = () => {
   useEffect(() => {
     const fetchPopup = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/trigger_check");
+        const res = await fetch("http://localhost:8002/api/trigger_check");
         if (!res.ok) throw new Error("Failed to fetch");
 
         const data = await res.json();
