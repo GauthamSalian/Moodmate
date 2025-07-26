@@ -111,12 +111,14 @@ def scheduled_check(username):
                 popup_state["show_popup"] = True
                 popup_state["support_message"] = send_supportive_message(result["text"])
                 popup_state["last_checked"] = now
+                popup_state["risky_tweet_text"] = result["text"]
                 return  # We found one, no need to check more
 
         # If loop ends without finding one
         popup_state["show_popup"] = False
         popup_state["support_message"] = None
         popup_state["last_checked"] = now
+        popup_state["risky_tweet_text"] = None  # 🔐 Preserve the tweet text
 
     except Exception as e:
         print("Scheduler error:", str(e))
@@ -259,7 +261,13 @@ for job in scheduler.get_jobs():
 
 @app.get("/api/trigger_check")
 def trigger_check():
-    return popup_state
+    return {
+        "show_popup": popup_state["show_popup"],
+        "support_message": popup_state["support_message"],
+        "last_checked": popup_state["last_checked"],
+        "risky_tweet_text": popup_state.get("risky_tweet_text")  # 👈 Now accessible to frontend
+    }
+
 
 @app.get("/analyze_tweets/{username}")
 def analyze_tweets(username: str, max_results: int = 5):
