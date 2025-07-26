@@ -196,7 +196,8 @@ const JournalDashboard = () => {
     console.log("Fetching for date:", formattedDate);
     setSelectedDate(date);
     try {
-      const res = await fetch(`http://localhost:8000/journal-entry/by-date?date=${formattedDate}`);
+      const res = await fetch(`http://localhost:8003/journal-entry/by-date?date_str=${formattedDate}`);
+
       if (!res.ok) {
         // No entry for this date
         setSavedEntry(null);

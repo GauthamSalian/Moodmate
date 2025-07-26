@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 from uuid import uuid4
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy.orm import Session
 from .database import Base, SessionLocal, engine
 from . import models
@@ -304,8 +304,13 @@ def update_journal_entry(entry_id: str, request: JournalEditRequest, db: Session
     }
 
 @app.get("/journal-entry/by-date", response_model=JournalEntryResponse)
-def get_journal_by_date(date: date = Query(...), db: Session = Depends(get_db)):
-    journal = db.query(models.JournalEntry).filter(models.JournalEntry.date == date).first()
+def get_journal_by_date(date_str: str = Query(...), db: Session = Depends(get_db)):
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    journal = db.query(models.JournalEntry).filter(models.JournalEntry.date == date_obj).first()
     if not journal:
         raise HTTPException(status_code=404, detail="No journal entry found for this date")
 
