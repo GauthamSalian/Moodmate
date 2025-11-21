@@ -50,8 +50,6 @@ MoodMate is a smart, AI-powered mental wellness assistant designed to support em
 ## 🙌 Team
 
 - 👨‍💻 **Gautham Salian** – Team Lead  
-- 👨‍💻 Mohammad Ashil  
-- 👨‍💻 Grathan P Bangera  
 
 ---
 
